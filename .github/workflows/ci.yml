@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Least-privilege token — this workflow only needs to read the repo.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same branch/PR to save CI minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build check (byte-compile + import the app)
+        run: |
+          python -m compileall -q app main.py seed.py
+          python -c "import main"
+
+      - name: Run tests
+        run: |
+          if find . -path ./venv -prune -o -type f -name "test_*.py" -print | grep -q . \
+             || find . -path ./venv -prune -o -type d -name "tests" -print | grep -q .; then
+            pip install pytest
+            pytest -v
+          else
+            echo "No test files found — skipping test step."
+          fi
