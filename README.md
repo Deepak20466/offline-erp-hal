@@ -3,9 +3,22 @@
 A fully offline, self-contained ERP for managing clients, contracts, contract
 line items, selective invoicing, payments/ledger, and admin-configurable
 dynamic fields — built with FastAPI, SQLAlchemy (SQLite), and server-rendered
-Jinja2 + Bootstrap 5 templates. Every static asset (Bootstrap, icons, the HAL
-logo) is bundled locally under `app/static/` — there is **no CDN dependency**
-and the app works with no internet connection at runtime.
+Jinja2 + Bootstrap 5 templates.
+
+## Project Overview
+
+Offline ERP HAL is an internal back-office system designed for environments
+with no internet dependency at runtime. Every static asset (Bootstrap, icons,
+the HAL logo) is vendored locally under `app/static/` — there is **no CDN
+dependency**, no external API calls, and no cloud service requirement. The
+entire application — authentication, contracts, invoicing, payments, and
+reporting — runs against a local SQLite database and can be deployed on a
+single offline machine.
+
+It was built for a contract-to-cash workflow: create a client, raise a
+contract with line items, selectively invoice those line items, record
+payments against invoices, and export any of it (CSV/PDF/Excel/Word/A4 print)
+for audit or filing.
 
 ## Features
 
@@ -16,8 +29,8 @@ and the app works with no internet connection at runtime.
 - **Roles & User Management** — Admin and Staff roles with route-level
   enforcement; admins get a full Users module (create, edit, search/filter
   by role & status, reset passwords, soft delete/restore/permanently delete),
-  with guard rails so the last remaining admin can never be demoted, deactivated,
-  or deleted, and nobody can lock themselves out.
+  with guard rails so the last remaining admin can never be demoted,
+  deactivated, or deleted, and nobody can lock themselves out.
 - **Dashboard** — live widgets (contracts, ordered/pending qty, invoices,
   outstanding receivables, recycle bin count) and quick actions.
 - **Clients** — CRUD, search, pagination (50/page, tested to 500+ records),
@@ -52,13 +65,32 @@ and the app works with no internet connection at runtime.
   bulk-select + bulk actions on list pages, toast notifications, confirmation
   dialogs, responsive layout.
 
-## Tech Stack
+## Screenshots
 
-Python 3.10+, FastAPI, SQLAlchemy 2.0 (SQLite), Jinja2, Bootstrap 5 (vendored
-locally), pandas + openpyxl (Excel export), ReportLab (PDF export),
-python-docx (Word export), Pillow (reads the logo's aspect ratio for exports).
+> Placeholders — replace with actual screenshots once available.
 
-## Project Structure
+| Login | Dashboard |
+|---|---|
+| ![Login screen](docs/screenshots/login.png) | ![Dashboard](docs/screenshots/dashboard.png) |
+
+| Contracts | Invoice Generation |
+|---|---|
+| ![Contracts list](docs/screenshots/contracts.png) | ![Invoice generation](docs/screenshots/invoice.png) |
+
+## Technology Stack
+
+| Layer | Technology |
+|---|---|
+| Backend framework | [FastAPI](https://fastapi.tiangolo.com/) (ASGI, Python 3.10+) |
+| ORM / Database | SQLAlchemy 2.0 + SQLite |
+| Templates / UI | Jinja2 + Bootstrap 5 (vendored locally, no CDN) |
+| Auth & Sessions | Signed, stateless session cookies (`itsdangerous`), `passlib`/`bcrypt` password hashing |
+| Validation | Pydantic 2 / `pydantic-settings` |
+| Exports | `pandas` + `openpyxl` (Excel), `ReportLab` (PDF), `python-docx` (Word) |
+| Images | Pillow (logo aspect-ratio handling for exports) |
+| Server | Uvicorn (ASGI) |
+
+## Folder Structure
 
 ```
 Hal/
@@ -67,40 +99,66 @@ Hal/
 ├── requirements.txt
 ├── data/                    # SQLite database file lives here
 ├── app/
-│   ├── config.py            # Settings (env-overridable)
-│   ├── database.py          # Engine/session/Base + init_db()
-│   ├── dependencies.py       # get_current_user / require_login / CSRF check
+│   ├── config.py             # Settings (env-overridable)
+│   ├── database.py           # Engine/session/Base + init_db()
+│   ├── dependencies.py       # get_current_user / require_login / require_admin / CSRF check
 │   ├── templating.py         # Jinja2Templates + filters (inr, fdate) + render()
-│   ├── models/               # 9 SQLAlchemy models (soft delete + timestamps)
-│   ├── schemas/               # Pydantic request/response schemas
-│   ├── services/              # Business logic / repository layer
-│   ├── routers/                # FastAPI APIRouters (one per module)
-│   ├── utils/                   # number-to-words, security, exporters, pagination
-│   ├── templates/                # Jinja2 templates (Bootstrap 5 UI)
-│   └── static/                    # Local Bootstrap/Icons + custom CSS/JS + logo
-└── scripts/                    # One-off maintenance scripts
+│   ├── models/                # SQLAlchemy models (soft delete + timestamps)
+│   ├── schemas/                # Pydantic request/response schemas
+│   ├── services/                # Business logic / repository layer
+│   ├── routers/                   # FastAPI APIRouters (one per module)
+│   ├── utils/                       # number-to-words, security, exporters, pagination
+│   ├── templates/                    # Jinja2 templates (Bootstrap 5 UI)
+│   └── static/                        # Local Bootstrap/Icons + custom CSS/JS + logo
+└── scripts/                            # One-off maintenance scripts
 ```
 
-## Setup
+## Installation & Setup
+
+### Prerequisites
+
+- Python 3.10+
+- `pip` and `venv`
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Deepak20466/offline-erp-hal.git
+cd offline-erp-hal
+```
+
+### 2. Create and activate a virtual environment
 
 ```powershell
-# 1. Create and activate a virtual environment
 python -m venv venv
 .\venv\Scripts\activate
+```
 
-# 2. Install dependencies
+### 3. Install dependencies
+
+```powershell
 pip install -r requirements.txt
+```
 
-# 3. Seed the database (creates data/hal_erp.db with an admin user + demo data)
+### 4. Seed the database
+
+```powershell
 python seed.py
+```
 
-# 4. Run the app
+This creates `data/hal_erp.db` with a seeded admin account and demo data.
+
+## Running the Application
+
+```powershell
 uvicorn main:app --reload
 ```
 
 Then open **http://127.0.0.1:8000** in your browser.
 
-### Default login (created by `seed.py`)
+## Login Instructions
+
+Use the seeded admin account created by `seed.py`:
 
 | Field           | Value              |
 |-----------------|--------------------|
@@ -110,62 +168,112 @@ Then open **http://127.0.0.1:8000** in your browser.
 | Security Q&A    | "What is your favorite aircraft?" → `tejas` |
 
 Change the password after first login via **Forgot Password** on the login
-page, using either the security answer or the admin PIN to authorize the reset.
-This account is seeded with the `admin` role — see Design Decisions below for
-why there's no public self-registration.
+page, using either the security answer or the admin PIN to authorize the
+reset. There is no public self-registration — new accounts are provisioned by
+an admin from the Users module.
 
-## Notes on Design Decisions
+## User Roles
 
-- **Excel is export-only.** Line items, contracts, and invoices are always
-  edited in the dashboard; Excel files are generated on demand as read-only
-  archives. There is no import path, so there is no two-way sync to reason about.
-- **Soft deletes everywhere.** Every table has an `is_deleted` flag; list
-  queries always filter it out, and the Recycle Bin is simply a view over
-  `is_deleted = true` rows, with a separate hard-delete path for permanent purge.
+| Role | Permissions |
+|---|---|
+| **Admin** | Full access: Users module (create/edit/reset password/soft delete/restore), Dynamic Field Manager, Void & Reissue on invoices and payments, Recycle Bin, all Staff permissions. Guard rails prevent the last remaining admin from being demoted, deactivated, or deleted. |
+| **Staff** | Clients, Contracts, Line Items, Invoices, Payments — create/edit/search/export within assigned modules. No access to Users module, Dynamic Field Manager, or Void & Reissue. |
+
+Role checks are enforced at the route/dependency layer (`app/dependencies.py`
+— `require_login` / `require_admin`), not just hidden in the UI.
+
+## Project Architecture
+
+```
+Browser (Jinja2 + Bootstrap 5, server-rendered)
+        │  HTML forms / links (no SPA, no client-side framework)
+        ▼
+FastAPI routers (app/routers/)  ──►  Pydantic schemas (app/schemas/)
+        │                                     │
+        ▼                                     ▼
+Service layer (app/services/)  ◄────  Business logic / validation
+        │
+        ▼
+SQLAlchemy models (app/models/)  ──►  SQLite (data/hal_erp.db)
+```
+
+- **Routers** handle HTTP concerns (auth, redirects, form parsing) and
+  delegate to services.
+- **Services** own business rules — e.g., invoice totals, sales-journal
+  posting, void/reissue logic, soft-delete semantics.
+- **Models** are SQLAlchemy 2.0 mapped classes; every table carries an
+  `is_deleted` flag and timestamps via shared mixins (`app/models/mixins.py`).
 - **Dynamic fields** are stored generically in `custom_fields` /
   `custom_field_values` and rendered through a single Jinja macro
   (`app/templates/partials/dynamic_field_input.html`), so adding a field in
   the admin panel immediately affects the relevant table and form with zero
   code changes.
-- **Selective invoicing**: an invoice is generated from one or more contract
-  line items (not the whole contract). Selected line items are stamped with
-  the invoice's id and locked from further edits; the invoice's own
-  `quantity`/`unit_rate` fields store the aggregate quantity and the
-  quantity-weighted average rate across the selected items.
 - **CSRF protection** uses stateless, signed, timestamped tokens
   (`itsdangerous`) embedded as a hidden field in every form — no server-side
   session store is required, which fits the fully offline deployment model.
-- **No public self-registration.** This is an internal, admin-provisioned ERP:
-  new accounts are created by an admin from the Users module (with a role,
-  password, and recovery Q&A/PIN set up front) rather than through an open
-  sign-up form, which would be the wrong trust model for an offline aerospace
-  back office.
-- **Sessions are stateless but revocable.** The session cookie is a signed
+- **Sessions are stateless but revocable** — the session cookie is a signed
   token embedding a `session_version`; changing a password (by the user or an
-  admin resetting it) bumps that counter, which instantly invalidates every
-  other outstanding session/remember-me cookie without needing a server-side
-  session store.
-- **Self-healing schema.** There's no Alembic migration chain; `init_db()`
-  diffs each SQLAlchemy model's columns against the live SQLite file via
-  `PRAGMA table_info` and adds anything missing on every startup. A companion
-  startup check guarantees at least one `admin` account always exists (it
-  promotes `admin@hal.internal`, or else the oldest account, if a schema
-  upgrade would otherwise leave nobody with admin rights).
+  admin resetting it) bumps that counter, instantly invalidating every other
+  outstanding session/remember-me cookie without a server-side session store.
 
-## Branding — the HAL logo
+## Database Setup
 
-The official Hindustan Aeronautics Limited logo lives at a single canonical
-path, `app/static/images/hal-logo.jpeg`, and is reused everywhere in the app:
-the login page, dashboard header, sidebar, top navbar, browser favicon, every
-PDF/Word export (letterhead), and every printable A4 report (`app/templates/partials/print_header.html`).
-`app/utils/branding.py` centralizes the file path and computes each export's
-logo height from its actual aspect ratio, so it is always scaled proportionally
-and never stretched or cropped, whether it's rendered at 200px (login), 50px
-(navbar), or 100px (PDF/print letterhead). To update the logo, replace that
-one file with a new image of the same name — no other code needs to change.
+- **Engine**: SQLite, file-based at `data/hal_erp.db` (created automatically
+  on first run).
+- **No Alembic migration chain.** `init_db()` (in `app/database.py`) diffs
+  each SQLAlchemy model's columns against the live SQLite file via
+  `PRAGMA table_info` and adds any missing columns on every startup —
+  a "self-healing" schema.
+- A companion startup check guarantees at least one `admin` account always
+  exists (it promotes `admin@hal.internal`, or else the oldest account, if a
+  schema upgrade would otherwise leave nobody with admin rights).
+- **Soft deletes everywhere.** Every table has an `is_deleted` flag; list
+  queries always filter it out, and the Recycle Bin is simply a view over
+  `is_deleted = true` rows, with a separate hard-delete path for permanent
+  purge.
+- To reset the database, stop the app, delete `data/hal_erp.db*`, and re-run
+  `python seed.py`.
 
-## Running Tests / Manual QA
+## Environment Variables
 
-There is no bundled test suite; validate changes by running the app locally
-(`uvicorn main:app --reload`), signing in with the seeded admin account, and
-exercising the CRUD/export/invoice/payment/recycle-bin flows through the UI.
+All settings are defined in `app/config.py` (via `pydantic-settings`) with
+sane defaults, and can be overridden with an `.env` file in the project root
+or real environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `APP_NAME` | `Offline ERP HAL` | Application display name |
+| `DATABASE_URL` | `sqlite:///data/hal_erp.db` | SQLAlchemy database URL |
+| `SECRET_KEY` | *(insecure placeholder — see below)* | Signing key for session cookies and CSRF tokens |
+| `SESSION_COOKIE_NAME` | `hal_erp_session` | Name of the session cookie |
+| `REMEMBER_ME_DAYS` | `30` | "Remember me" cookie lifetime, in days |
+| `SESSION_HOURS` | `12` | Normal session lifetime, in hours |
+| `PAGE_SIZE` | `50` | Rows per page on list views |
+| `COMPANY_NAME` | `Hindustan Aeronautics Limited` | Name used on exports/letterheads |
+| `GST_DEFAULT_PERCENTAGE` | `18.0` | Default GST % applied on invoices |
+
+> **Security note:** `SECRET_KEY` ships with a placeholder default. The app
+> logs a warning at startup if it detects the default value is still in use.
+> Always set a unique `SECRET_KEY` via `.env` before any real/production
+> deployment, since it signs both session cookies and CSRF tokens.
+
+## Future Improvements
+
+- Automated test suite (unit + integration) — currently validated manually.
+- Alembic-based migrations for more complex schema evolution.
+- Multi-currency support for invoicing.
+- Configurable GST/tax rules per client or contract.
+- Role granularity beyond Admin/Staff (e.g., read-only auditor role).
+- Scheduled/automated database backups.
+
+## License
+
+This project is provided for internal use. Add a license of your choice
+(e.g., MIT, Apache 2.0) here if the project is to be distributed or
+open-sourced.
+
+## Author
+
+**K Deepak**
+Email: kdeepak162001@gmail.com
+GitHub: [@Deepak20466](https://github.com/Deepak20466)
