@@ -1,0 +1,24 @@
+{% macro render_pagination(page_result, base_url, extra_query='') %}
+{% if page_result.total_items > 0 %}
+<div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+  <div class="text-muted small">
+    Showing {{ page_result.start_index }}–{{ page_result.end_index }} of {{ page_result.total_items }}
+  </div>
+  <nav>
+    <ul class="pagination pagination-sm mb-0">
+      <li class="page-item {{ 'disabled' if not page_result.has_prev }}">
+        <a class="page-link" href="{{ base_url }}?page={{ page_result.page - 1 }}{{ extra_query }}">Previous</a>
+      </li>
+      {% for p in page_result.page_range %}
+      <li class="page-item {{ 'active' if p == page_result.page }}">
+        <a class="page-link" href="{{ base_url }}?page={{ p }}{{ extra_query }}">{{ p }}</a>
+      </li>
+      {% endfor %}
+      <li class="page-item {{ 'disabled' if not page_result.has_next }}">
+        <a class="page-link" href="{{ base_url }}?page={{ page_result.page + 1 }}{{ extra_query }}">Next</a>
+      </li>
+    </ul>
+  </nav>
+</div>
+{% endif %}
+{% endmacro %}

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% import "partials/dynamic_field_input.html" as dfi %}
+{% import "partials/page_header.html" as ph %}
+{% block title %}Generate Invoice — Offline ERP HAL{% endblock %}
+{% block breadcrumb_extra %}
+<li class="breadcrumb-item active" aria-current="page">Generate Invoice</li>
+{% endblock %}
+{% block content %}
+{% call ph.render_page_header('Generate Invoice', icon='bi-receipt-cutoff') %}
+  <a href="/invoices" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Invoices</a>
+{% endcall %}
+
+<div class="card mb-3">
+  <div class="card-header">Step 1 — Select Contract</div>
+  <div class="card-body">
+    <form method="get" action="/invoices/new" class="row g-2">
+      <div class="col-md-8">
+        <select class="form-select" name="contract_id" onchange="this.form.submit()">
+          <option value="">-- Select a contract --</option>
+          {% for c in contracts %}
+          <option value="{{ c.id }}" {{ 'selected' if selected_contract and c.id == selected_contract.id }}>
+            {{ c.contract_number }} — {{ c.client.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Filter contracts...">
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if voided_invoice %}
+<div class="alert alert-info">
+  <i class="bi bi-arrow-repeat me-1"></i>Reissuing voided invoice <strong>{{ voided_invoice.invoice_number }}</strong>
+  (voided: {{ voided_invoice.void_reason }}). Select the corrected line items/quantities below and give this invoice a new number.
+</div>
+{% endif %}
+
+{% if selected_contract %}
+<div class="card mb-3">
+  <div class="card-header">Step 2 — Select Line Items to Invoice</div>
+  <div class="card-body">
+    {% if not invoiceable_items %}
+    <p class="text-muted mb-0">All line items on this contract have already been invoiced, or none exist yet.
+      <a href="/contracts/{{ selected_contract.id }}">Add line items</a>.</p>
+    {% else %}
+    <form method="post" action="/invoices" id="invoiceForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="contract_id" value="{{ selected_contract.id }}">
+      {% if reissue_of %}<input type="hidden" name="reissued_from_id" value="{{ reissue_of }}">{% endif %}
+
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Customer Name</label>
+          <input type="text" class="form-control" value="{{ selected_contract.client.name }}" readonly>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">GSTIN</label>
+          <input type="text" class="form-control" value="{{ selected_contract.client.gstin or '—' }}" readonly>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">PAN</label>
+          <input type="text" class="form-control" value="{{ selected_contract.client.pan or '—' }}" readonly>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Invoice Number <span class="required-marker">*</span></label>
+          <input type="text" class="form-control" name="invoice_number" required
+                 value="INV-{{ selected_contract.contract_number }}-{{ (selected_contract.invoices | rejectattr('is_deleted') | list | length) + 1 }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Invoice Date <span class="required-marker">*</span></label>
+          <input type="date" class="form-control" name="invoice_date" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">GST % <span class="required-marker">*</span></label>
+          <input type="number" step="0.01" class="form-control" id="gst_percentage" name="gst_percentage" value="{{ gst_default }}" required>
+        </div>
+      </div>
+
+      <div class="table-responsive-hal mb-3">
+        <table class="table table-hal align-middle">
+          <thead>
+            <tr>
+              <th style="width:40px;"><input type="checkbox" id="checkAll"></th>
+              <th>Description</th>
+              <th style="width:140px;">Quantity</th>
+              <th style="width:160px;">Unit Rate</th>
+              <th style="width:160px;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in invoiceable_items %}
+            <tr>
+              <td><input type="checkbox" class="item-check" name="line_item_ids" value="{{ item.id }}" data-amount-target="amount_{{ item.id }}"></td>
+              <td>{{ item.description }}</td>
+              <td><input type="number" step="0.01" class="form-control item-qty" name="qty_{{ item.id }}" value="{{ item.quantity }}" data-item="{{ item.id }}"></td>
+              <td><input type="number" step="0.01" class="form-control item-rate" name="rate_{{ item.id }}" value="{{ item.unit_rate }}" data-item="{{ item.id }}"></td>
+              <td class="item-amount" id="amount_{{ item.id }}">{{ item.amount | inr }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="row justify-content-end">
+        <div class="col-md-4">
+          <table class="table table-sm">
+            <tr><td>Line Total</td><td class="text-end" id="lineTotalDisplay">0.00</td></tr>
+            <tr><td>GST Amount</td><td class="text-end" id="gstAmountDisplay">0.00</td></tr>
+            <tr class="fw-bold border-top"><td>Grand Total</td><td class="text-end" id="grandTotalDisplay">0.00</td></tr>
+          </table>
+        </div>
+      </div>
+
+      {% if custom_fields %}
+      <hr>
+      {% for field in custom_fields %}
+        {{ dfi.render_dynamic_field(field, None) }}
+      {% endfor %}
+      {% endif %}
+
+      <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Generate Invoice</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var checkAll = document.getElementById("checkAll");
+  var itemChecks = document.querySelectorAll(".item-check");
+  var qtyInputs = document.querySelectorAll(".item-qty");
+  var rateInputs = document.querySelectorAll(".item-rate");
+  var gstInput = document.getElementById("gst_percentage");
+
+  function recalc() {
+    var lineTotal = 0;
+    itemChecks.forEach(function (cb) {
+      var itemId = cb.value;
+      var amountCell = document.getElementById("amount_" + itemId);
+      if (!cb.checked) { if (amountCell) amountCell.textContent = "0.00"; return; }
+      var qty = parseFloat(document.querySelector('.item-qty[data-item="' + itemId + '"]').value) || 0;
+      var rate = parseFloat(document.querySelector('.item-rate[data-item="' + itemId + '"]').value) || 0;
+      var amount = qty * rate;
+      if (amountCell) amountCell.textContent = amount.toFixed(2);
+      lineTotal += amount;
+    });
+    var gstPct = parseFloat(gstInput.value) || 0;
+    var gstAmount = lineTotal * gstPct / 100;
+    var grandTotal = lineTotal + gstAmount;
+    document.getElementById("lineTotalDisplay").textContent = lineTotal.toFixed(2);
+    document.getElementById("gstAmountDisplay").textContent = gstAmount.toFixed(2);
+    document.getElementById("grandTotalDisplay").textContent = grandTotal.toFixed(2);
+  }
+
+  if (checkAll) {
+    checkAll.addEventListener("change", function () {
+      itemChecks.forEach(function (cb) { cb.checked = checkAll.checked; });
+      recalc();
+    });
+  }
+  itemChecks.forEach(function (cb) { cb.addEventListener("change", recalc); });
+  qtyInputs.forEach(function (i) { i.addEventListener("input", recalc); });
+  rateInputs.forEach(function (i) { i.addEventListener("input", recalc); });
+  if (gstInput) gstInput.addEventListener("input", recalc);
+  recalc();
+})();
+</script>
+{% endblock %}

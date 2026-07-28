@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% import "partials/page_header.html" as ph %}
+{% block title %}My Profile — Offline ERP HAL{% endblock %}
+{% block content %}
+{{ ph.render_page_header('My Profile', icon='bi-person-circle') }}
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">Account Details</div>
+      <div class="card-body">
+        {% if error %}<div class="alert alert-danger py-2">{{ error }}</div>{% endif %}
+        <form method="post" action="/profile">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label class="form-label">Full Name <span class="required-marker">*</span></label>
+            <input type="text" class="form-control" name="name" value="{{ current_user.name }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Email <span class="required-marker">*</span></label>
+            <input type="email" class="form-control" name="email" value="{{ current_user.email }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Security Question <span class="required-marker">*</span></label>
+            <input type="text" class="form-control" name="security_question" value="{{ current_user.security_question }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Security Answer</label>
+            <input type="text" class="form-control" name="security_answer" placeholder="Leave blank to keep your current answer">
+            <div class="form-text">Used for account recovery via Forgot Password.</div>
+          </div>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle me-1"></i>Save Changes</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header">Role &amp; Status</div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-muted">Role</span>
+          <span class="badge {{ 'text-bg-primary' if current_user.role == 'admin' else 'text-bg-secondary' }} text-capitalize">{{ current_user.role }}</span>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-muted">Last Login</span>
+          <span>{{ current_user.last_login_at | fdate('%d-%b-%Y %H:%M') if current_user.last_login_at else '—' }}</span>
+        </div>
+        <div class="d-flex justify-content-between">
+          <span class="text-muted">Member Since</span>
+          <span>{{ current_user.created_at | fdate }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Security</div>
+      <div class="card-body">
+        <p class="text-muted small">Change your password regularly to keep your account secure.</p>
+        <a href="/change-password" class="btn btn-outline-primary w-100"><i class="bi bi-shield-lock me-1"></i>Change Password</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% macro render_bulk_toolbar(action_url, singular, plural) %}
+<div class="alert alert-primary d-none d-flex align-items-center justify-content-between gap-2 no-print" id="bulkToolbar" data-bulk-toolbar>
+  <span><strong><span data-bulk-count>0</span></strong> {{ singular }}(s) selected</span>
+  <form method="post" action="{{ action_url }}" data-confirm="Move all selected {{ plural }} to the recycle bin?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="ids" data-bulk-ids-input>
+    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash3 me-1"></i>Move Selected to Recycle Bin</button>
+  </form>
+</div>
+{% endmacro %}

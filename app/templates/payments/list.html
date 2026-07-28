@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% import "partials/pagination.html" as pager %}
+{% import "partials/print_header.html" as printh %}
+{% import "partials/export_bar.html" as eb %}
+{% import "partials/page_header.html" as ph %}
+{% block title %}Payments & Ledger — Offline ERP HAL{% endblock %}
+{% block content %}
+{{ printh.render_print_header('Payment & Ledger Register') }}
+{{ ph.render_page_header('Payment & Ledger Tracker', icon='bi-cash-coin') }}
+
+<div class="card mb-3 no-print">
+  <div class="card-body d-flex flex-wrap gap-2 align-items-center justify-content-between">
+    <form method="get" action="/payments" class="d-flex flex-wrap gap-2">
+      <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Search invoice # or client...">
+      <select class="form-select" name="status" onchange="this.form.submit()">
+        <option value="">All Invoices</option>
+        <option value="posted" {{ 'selected' if status == 'posted' }}>Posted</option>
+        <option value="void" {{ 'selected' if status == 'void' }}>Void</option>
+      </select>
+      <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+      {% if q or status %}<a href="/payments" class="btn btn-outline-secondary">Clear</a>{% endif %}
+    </form>
+    {{ eb.render_export_bar('/payments', 'q=' ~ q ~ '&status=' ~ status, 'A4 Print') }}
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive-hal">
+    <table class="table table-hal table-striped mb-0 align-middle">
+      <thead>
+        <tr>
+          <th style="width:60px;">S.No</th>
+          <th>Invoice #</th>
+          <th>Client Name</th>
+          <th>Invoice Amount</th>
+          <th>Amount Paid</th>
+          <th>Outstanding</th>
+          <th>Status</th>
+          <th class="no-print" style="width:180px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for invoice in page_result.items %}
+        {% set totals = totals_by_id[invoice.id] %}
+        <tr>
+          <td>{{ page_result.start_index + loop.index0 }}</td>
+          <td><a href="/invoices/{{ invoice.id }}">{{ invoice.invoice_number }}</a></td>
+          <td>{{ invoice.customer_name }}</td>
+          <td>{{ totals.invoice_amount | inr }}</td>
+          <td>{{ totals.amount_paid | inr }}</td>
+          <td>{{ totals.outstanding | inr }}</td>
+          <td>
+            {% if invoice.is_void %}<span class="badge text-bg-dark">Void</span>
+            {% elif totals.payment_status == 'fully_paid' %}<span class="badge badge-status-paid">Fully Paid</span>
+            {% elif totals.payment_status == 'partially_paid' %}<span class="badge badge-status-partial">Partially Paid</span>
+            {% elif totals.payment_status == 'ld_applied' %}<span class="badge badge-status-ld">LD Applied</span>
+            {% else %}<span class="badge badge-status-pending">Pending</span>{% endif %}
+          </td>
+          <td class="no-print">
+            {% if not invoice.is_void %}
+            <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#recordPaymentModal{{ invoice.id }}"><i class="bi bi-plus-lg"></i> Pay</button>
+            {% endif %}
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#historyModal{{ invoice.id }}" title="Payment History"><i class="bi bi-clock-history"></i></button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No invoices found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{{ pager.render_pagination(page_result, '/payments', '&q=' ~ q ~ '&status=' ~ status) }}
+
+{% for invoice in page_result.items %}
+<!-- Record Payment Modal -->
+<div class="modal fade" id="recordPaymentModal{{ invoice.id }}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/payments">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="invoice_id" value="{{ invoice.id }}">
+        <div class="modal-header">
+          <h5 class="modal-title">Record Payment — {{ invoice.invoice_number }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted">Outstanding: <strong>₹ {{ totals_by_id[invoice.id].outstanding | inr }}</strong></p>
+          <div class="mb-3">
+            <label class="form-label">Amount Received <span class="required-marker">*</span></label>
+            <input type="number" step="0.01" class="form-control" name="amount_received" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Payment Date <span class="required-marker">*</span></label>
+            <input type="date" class="form-control" name="payment_date" required>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">TDS Deducted</label>
+              <input type="number" step="0.01" class="form-control" name="tds_deducted" value="0">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">LD Applied</label>
+              <input type="number" step="0.01" class="form-control" name="ld_applied" value="0">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Remarks</label>
+            <textarea class="form-control" name="remarks" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">Save Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Payment History Modal -->
+<div class="modal fade" id="historyModal{{ invoice.id }}" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Payment History — {{ invoice.invoice_number }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-sm">
+          <thead><tr><th>Date</th><th>Amount</th><th>TDS</th><th>LD</th><th>Remarks</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {% for p in payments_by_invoice[invoice.id] %}
+            <tr class="{{ 'table-secondary text-decoration-line-through' if p.is_deleted }}">
+              <td>{{ p.payment_date | fdate }}</td>
+              <td>{{ p.amount_received | inr }}</td>
+              <td>{{ p.tds_deducted | inr }}</td>
+              <td>{{ p.ld_applied | inr }}</td>
+              <td>{{ p.remarks or '' }}</td>
+              <td>
+                {% if p.is_deleted %}<span class="badge text-bg-dark" title="{{ p.void_reason }}">Void</span>
+                {% else %}{{ p.payment_status.replace('_', ' ') | title }}{% endif %}
+              </td>
+              <td>
+                {% if not p.is_deleted and current_user.is_admin %}
+                <form method="post" action="/payments/{{ p.id }}/void" class="d-inline" data-prompt-reason="Reason for voiding this payment (this cannot be undone):">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="reason">
+                  <button class="btn btn-sm btn-outline-danger" type="submit" title="Void"><i class="bi bi-x-octagon"></i></button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-3">No payments recorded yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if open_invoice_id %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var modalEl = document.getElementById("recordPaymentModal{{ open_invoice_id }}");
+  if (modalEl) new bootstrap.Modal(modalEl).show();
+});
+</script>
+{% endif %}
+{% endblock %}

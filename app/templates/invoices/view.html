@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% import "partials/dynamic_field_input.html" as dfi %}
+{% import "partials/page_header.html" as ph %}
+{% block title %}{{ invoice.invoice_number }} — Offline ERP HAL{% endblock %}
+{% block breadcrumb_extra %}
+<li class="breadcrumb-item active" aria-current="page">{{ invoice.invoice_number }}</li>
+{% endblock %}
+{% block content %}
+{% call ph.render_page_header('Invoice ' ~ invoice.invoice_number, icon='bi-receipt') %}
+  {% if invoice.is_void %}<span class="badge text-bg-dark align-self-center me-2">Void</span>{% endif %}
+  <a href="/invoices" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  {% if not invoice.is_void %}
+  <a href="/payments?invoice_id={{ invoice.id }}" class="btn btn-outline-success"><i class="bi bi-cash-coin me-1"></i>Record Payment</a>
+  {% endif %}
+  <a class="btn btn-outline-success" href="/invoices/{{ invoice.id }}/export/csv"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+  <a class="btn btn-outline-danger" href="/invoices/{{ invoice.id }}/export/pdf"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
+  <a class="btn btn-outline-primary" href="/invoices/{{ invoice.id }}/export/excel"><i class="bi bi-filetype-xlsx me-1"></i>Excel</a>
+  <a class="btn btn-outline-info" href="/invoices/{{ invoice.id }}/export/word"><i class="bi bi-filetype-docx me-1"></i>Word</a>
+  <button class="btn btn-outline-dark" onclick="window.print()"><i class="bi bi-printer me-1"></i>A4 Print</button>
+  {% if invoice.is_void and not reissued_to %}
+  <a href="/invoices/{{ invoice.id }}/reissue" class="btn btn-success"><i class="bi bi-arrow-repeat me-1"></i>Reissue</a>
+  {% endif %}
+  {% if current_user.is_admin and not invoice.is_void %}
+  <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#voidInvoiceModal"><i class="bi bi-x-octagon me-1"></i>Void Invoice</button>
+  {% endif %}
+{% endcall %}
+
+{% if invoice.is_void %}
+<div class="alert alert-dark no-print">
+  <i class="bi bi-x-octagon me-1"></i><strong>This invoice is void</strong> (voided {{ invoice.voided_at | fdate('%d-%b-%Y %H:%M') }}). Reason: {{ invoice.void_reason }}
+  {% if reissued_to %}<br>Reissued as <a href="/invoices/{{ reissued_to.id }}">{{ reissued_to.invoice_number }}</a>.{% endif %}
+</div>
+{% endif %}
+{% if reissued_from %}
+<div class="alert alert-info no-print"><i class="bi bi-info-circle me-1"></i>This invoice reissues voided invoice <a href="/invoices/{{ reissued_from.id }}">{{ reissued_from.invoice_number }}</a>.</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-body p-4">
+    <div class="d-flex align-items-center mb-4">
+      <img src="/static/images/hal-logo.jpeg" alt="HAL logo" style="width:100px;height:auto;" class="print-logo me-3">
+      <div>
+        <h4 class="mb-0 text-hal-blue">Hindustan Aeronautics Limited</h4>
+        <div class="text-muted">TAX INVOICE</div>
+      </div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <p class="mb-1"><strong>Invoice Number:</strong> {{ invoice.invoice_number }}</p>
+        <p class="mb-1"><strong>Invoice Date:</strong> {{ invoice.invoice_date | fdate }}</p>
+        <p class="mb-1"><strong>Contract #:</strong> {{ invoice.contract.contract_number }}</p>
+      </div>
+      <div class="col-md-6">
+        <p class="mb-1"><strong>Customer Name:</strong> {{ invoice.customer_name }}</p>
+        <p class="mb-1"><strong>GSTIN:</strong> {{ invoice.gstin or '—' }}</p>
+        <p class="mb-1"><strong>PAN:</strong> {{ invoice.pan or '—' }}</p>
+      </div>
+    </div>
+
+    <table class="table table-bordered">
+      <thead class="table-light">
+        <tr><th>#</th><th>Description</th><th>Quantity</th><th>Unit Rate</th><th>Amount</th></tr>
+      </thead>
+      <tbody>
+        {% for item in invoice.invoiced_line_items %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ item.description }}</td>
+          <td>{{ item.quantity | inr }}</td>
+          <td>{{ item.unit_rate | inr }}</td>
+          <td>{{ item.amount | inr }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="row justify-content-end">
+      <div class="col-md-4">
+        <table class="table table-sm">
+          <tr><td>Line Total</td><td class="text-end">₹ {{ invoice.line_total | inr }}</td></tr>
+          <tr><td>GST @ {{ invoice.gst_percentage }}%</td><td class="text-end">₹ {{ invoice.gst_amount | inr }}</td></tr>
+          <tr class="fw-bold border-top"><td>Grand Total</td><td class="text-end">₹ {{ invoice.grand_total | inr }}</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <p class="mt-3"><strong>Amount in Words:</strong> {{ invoice.amount_in_words }}</p>
+
+    {% if custom_fields %}
+    <div class="row">
+      {% for f in custom_fields %}
+      <div class="col-md-4 mb-2"><strong>{{ f.field_label }}:</strong> {{ dfi.render_dynamic_cell(f, custom_values.get(f.id)) }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <hr>
+    <div class="row">
+      <div class="col-md-4"><strong>Amount Paid:</strong> ₹ {{ totals.amount_paid | inr }}</div>
+      <div class="col-md-4"><strong>Outstanding:</strong> ₹ {{ totals.outstanding | inr }}</div>
+      <div class="col-md-4">
+        <strong>Status:</strong>
+        {% if totals.payment_status == 'fully_paid' %}<span class="badge badge-status-paid">Fully Paid</span>
+        {% elif totals.payment_status == 'partially_paid' %}<span class="badge badge-status-partial">Partially Paid</span>
+        {% elif totals.payment_status == 'ld_applied' %}<span class="badge badge-status-ld">LD Applied</span>
+        {% else %}<span class="badge badge-status-pending">Pending</span>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Void Invoice Modal -->
+<div class="modal fade" id="voidInvoiceModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/invoices/{{ invoice.id }}/void">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-x-octagon text-danger me-2"></i>Void Invoice {{ invoice.invoice_number }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-warning small"><i class="bi bi-exclamation-triangle me-1"></i>Voiding preserves this invoice permanently for audit — it reverses the sales journal and unlocks its line items so you can reissue a corrected invoice. This cannot be undone.</div>
+          <div class="mb-3">
+            <label class="form-label">Reason for voiding <span class="required-marker">*</span></label>
+            <textarea class="form-control" name="reason" rows="3" required placeholder="e.g. Incorrect GST rate applied, wrong client billed, etc."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">Void Invoice</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

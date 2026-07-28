@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% import "partials/pagination.html" as pager %}
+{% import "partials/page_header.html" as ph %}
+{% block title %}Recycle Bin — Offline ERP HAL{% endblock %}
+{% block content %}
+{% call ph.render_page_header('Recycle Bin', icon='bi-trash3') %}
+  <form method="post" action="/recycle-bin/{{ module }}/empty" data-confirm="Permanently delete ALL {{ module }} in the recycle bin? This cannot be undone.">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-outline-danger" {{ 'disabled' if page_result.total_items == 0 }}>
+      <i class="bi bi-trash3-fill me-1"></i>Empty Recycle Bin
+    </button>
+  </form>
+{% endcall %}
+
+<ul class="nav nav-tabs mb-3">
+  {% for m in modules %}
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if module == m }}" href="/recycle-bin?module={{ m }}">{{ m | capitalize }}</a>
+  </li>
+  {% endfor %}
+</ul>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" action="/recycle-bin" class="d-flex gap-2">
+      <input type="hidden" name="module" value="{{ module }}">
+      <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Search...">
+      <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive-hal">
+    <table class="table table-hal table-striped mb-0 align-middle">
+      <thead>
+        <tr>
+          <th style="width:60px;">S.No</th>
+          {% if module == 'clients' %}
+          <th>Name</th><th>Email</th><th>Phone</th>
+          {% elif module == 'contracts' %}
+          <th>Contract Number</th><th>Client</th><th>Contract Date</th>
+          {% elif module == 'users' %}
+          <th>Name</th><th>Email</th><th>Role</th>
+          {% endif %}
+          <th>Deleted On</th>
+          <th style="width:180px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in page_result.items %}
+        <tr>
+          <td>{{ page_result.start_index + loop.index0 }}</td>
+          {% if module == 'clients' %}
+          <td>{{ record.name }}</td><td>{{ record.email or '' }}</td><td>{{ record.phone or '' }}</td>
+          {% elif module == 'contracts' %}
+          <td>{{ record.contract_number }}</td><td>{{ record.client.name if record.client else '' }}</td><td>{{ record.contract_date | fdate }}</td>
+          {% elif module == 'users' %}
+          <td>{{ record.name }}</td><td>{{ record.email }}</td><td class="text-capitalize">{{ record.role }}</td>
+          {% endif %}
+          <td>{{ record.updated_at | fdate('%d-%b-%Y %H:%M') }}</td>
+          <td>
+            <form method="post" action="/recycle-bin/{{ module }}/{{ record.id }}/restore" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-success" type="submit"><i class="bi bi-arrow-counterclockwise"></i> Restore</button>
+            </form>
+            <form method="post" action="/recycle-bin/{{ module }}/{{ record.id }}/purge" class="d-inline" data-confirm="Permanently delete this record? This cannot be undone.">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-circle"></i> Delete Forever</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">Recycle bin is empty.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{{ pager.render_pagination(page_result, '/recycle-bin', '&module=' ~ module ~ '&q=' ~ q) }}
+{% endblock %}

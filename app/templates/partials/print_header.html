@@ -1,0 +1,9 @@
+{% macro render_print_header(title) %}
+<div class="print-only print-header mb-3">
+  <img src="/static/images/hal-logo.jpeg" alt="HAL logo" class="print-logo">
+  <div>
+    <h4 class="mb-0">Hindustan Aeronautics Limited</h4>
+    <div class="text-muted">{{ title }}</div>
+  </div>
+</div>
+{% endmacro %}

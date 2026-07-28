@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% import "partials/pagination.html" as pager %}
+{% import "partials/print_header.html" as printh %}
+{% import "partials/export_bar.html" as eb %}
+{% import "partials/page_header.html" as ph %}
+{% block title %}Invoices — Offline ERP HAL{% endblock %}
+{% block content %}
+{{ printh.render_print_header('Invoice Register') }}
+{% call ph.render_page_header('Invoices', icon='bi-receipt') %}
+  <a href="/invoices/new" class="btn btn-primary"><i class="bi bi-receipt-cutoff me-1"></i>Generate Invoice</a>
+{% endcall %}
+
+<div class="card mb-3 no-print">
+  <div class="card-body d-flex flex-wrap gap-2 align-items-center justify-content-between">
+    <form method="get" action="/invoices" class="d-flex flex-wrap gap-2">
+      <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Search invoice # or customer...">
+      <select class="form-select" name="status" onchange="this.form.submit()">
+        <option value="">All Invoices</option>
+        <option value="posted" {{ 'selected' if status == 'posted' }}>Posted</option>
+        <option value="void" {{ 'selected' if status == 'void' }}>Void</option>
+      </select>
+      <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+      {% if q or status %}<a href="/invoices" class="btn btn-outline-secondary">Clear</a>{% endif %}
+    </form>
+    {{ eb.render_export_bar('/invoices', 'q=' ~ q ~ '&status=' ~ status, 'A4 Print') }}
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive-hal">
+    <table class="table table-hal table-striped mb-0 align-middle">
+      <thead>
+        <tr>
+          <th style="width:60px;">S.No</th>
+          <th>Invoice #</th>
+          <th>Customer</th>
+          <th>Invoice Date</th>
+          <th>Grand Total</th>
+          <th>Amount Paid</th>
+          <th>Outstanding</th>
+          <th>Status</th>
+          <th class="no-print" style="width:120px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for invoice in page_result.items %}
+        {% set totals = totals_by_id[invoice.id] %}
+        <tr>
+          <td>{{ page_result.start_index + loop.index0 }}</td>
+          <td><a href="/invoices/{{ invoice.id }}">{{ invoice.invoice_number }}</a></td>
+          <td>{{ invoice.customer_name }}</td>
+          <td>{{ invoice.invoice_date | fdate }}</td>
+          <td>{{ invoice.grand_total | inr }}</td>
+          <td>{{ totals.amount_paid | inr }}</td>
+          <td>{{ totals.outstanding | inr }}</td>
+          <td>
+            {% if invoice.is_void %}<span class="badge text-bg-dark">Void</span>
+            {% elif totals.payment_status == 'fully_paid' %}<span class="badge badge-status-paid">Fully Paid</span>
+            {% elif totals.payment_status == 'partially_paid' %}<span class="badge badge-status-partial">Partially Paid</span>
+            {% elif totals.payment_status == 'ld_applied' %}<span class="badge badge-status-ld">LD Applied</span>
+            {% else %}<span class="badge badge-status-pending">Pending</span>{% endif %}
+          </td>
+          <td class="no-print">
+            <a href="/invoices/{{ invoice.id }}" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye"></i></a>
+            {% if invoice.is_void %}
+            <a href="/invoices/{{ invoice.id }}/reissue" class="btn btn-sm btn-outline-success" title="Reissue"><i class="bi bi-arrow-repeat"></i></a>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-4">No invoices found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{{ pager.render_pagination(page_result, '/invoices', '&q=' ~ q ~ '&status=' ~ status) }}
+{% endblock %}

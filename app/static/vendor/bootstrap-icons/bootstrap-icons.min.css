@@ -1,0 +1,84 @@
+/*!
+ * Bootstrap Icons (reconstructed subset for this offline install)
+ * Original project: https://icons.getbootstrap.com/ — MIT Licensed
+ * This file defines only the icon glyphs actually used by this application's
+ * templates. Every codepoint below was verified against the glyphs embedded
+ * in the locally bundled fonts/bootstrap-icons.woff(2) files before being
+ * added here, so the icon names below are guaranteed to render correctly
+ * with the vendored font — no CDN, no network access required at runtime.
+ */
+@font-face {
+  font-display: block;
+  font-family: "bootstrap-icons";
+  src: url("./fonts/bootstrap-icons.woff2") format("woff2"),
+       url("./fonts/bootstrap-icons.woff") format("woff");
+}
+
+.bi::before,
+[class^="bi-"]::before,
+[class*=" bi-"]::before {
+  display: inline-block;
+  font-family: bootstrap-icons !important;
+  font-style: normal;
+  font-weight: normal !important;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  vertical-align: -.125em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.bi-arrow-counterclockwise::before { content: "\f117"; }
+.bi-arrow-down::before { content: "\f128"; }
+.bi-arrow-down-up::before { content: "\f127"; }
+.bi-arrow-left::before { content: "\f12f"; }
+.bi-arrow-repeat::before { content: "\f130"; }
+.bi-arrow-up::before { content: "\f148"; }
+.bi-box-arrow-right::before { content: "\f1c3"; }
+.bi-box-seam::before { content: "\f1c7"; }
+.bi-caret-down-fill::before { content: "\f229"; }
+.bi-caret-up-fill::before { content: "\f235"; }
+.bi-cash-coin::before { content: "\f632"; }
+.bi-check-circle::before { content: "\f26b"; }
+.bi-check-square::before { content: "\f26d"; }
+.bi-check2-circle::before { content: "\f270"; }
+.bi-clock-history::before { content: "\f292"; }
+.bi-dash::before { content: "\f2ea"; }
+.bi-dash-square::before { content: "\f2e9"; }
+.bi-exclamation-circle::before { content: "\f333"; }
+.bi-exclamation-triangle::before { content: "\f33b"; }
+.bi-eye::before { content: "\f341"; }
+.bi-eye-slash::before { content: "\f340"; }
+.bi-file-earmark-plus::before { content: "\f37d"; }
+.bi-file-earmark-text::before { content: "\f38b"; }
+.bi-filetype-csv::before { content: "\f743"; }
+.bi-filetype-docx::before { content: "\f745"; }
+.bi-filetype-pdf::before { content: "\f756"; }
+.bi-filetype-xlsx::before { content: "\f793"; }
+.bi-hourglass-split::before { content: "\f41f"; }
+.bi-house-door::before { content: "\f423"; }
+.bi-info-circle::before { content: "\f431"; }
+.bi-key::before { content: "\f44f"; }
+.bi-list::before { content: "\f479"; }
+.bi-list-ul::before { content: "\f478"; }
+.bi-moon-stars::before { content: "\f496"; }
+.bi-people::before { content: "\f4d0"; }
+.bi-people-fill::before { content: "\f4cf"; }
+.bi-person::before { content: "\f4e1"; }
+.bi-person-circle::before { content: "\f4d7"; }
+.bi-person-plus::before { content: "\f4dd"; }
+.bi-plus-lg::before { content: "\f64d"; }
+.bi-printer::before { content: "\f501"; }
+.bi-receipt::before { content: "\f50f"; }
+.bi-receipt-cutoff::before { content: "\f50e"; }
+.bi-search::before { content: "\f52a"; }
+.bi-shield-lock::before { content: "\f538"; }
+.bi-sliders::before { content: "\f56b"; }
+.bi-speedometer2::before { content: "\f580"; }
+.bi-sun::before { content: "\f5a2"; }
+.bi-trash3::before { content: "\f78b"; }
+.bi-trash3-fill::before { content: "\f78a"; }
+.bi-x-circle::before { content: "\f623"; }
+.bi-x-octagon::before { content: "\f627"; }
+.bi-pencil::before { content: "\f4cb"; }

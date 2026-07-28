@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% import "partials/page_header.html" as ph %}
+{% block title %}Dynamic Field Manager — Offline ERP HAL{% endblock %}
+{% block content %}
+{% call ph.render_page_header('Dynamic Field Manager', subtitle='Add, edit, reorder, and hide custom fields per module — no code changes required.', icon='bi-sliders') %}
+  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFieldModal">
+    <i class="bi bi-plus-lg me-1"></i>Add New Field
+  </button>
+{% endcall %}
+
+<ul class="nav nav-tabs mb-3">
+  {% for m in modules %}
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if module == m }}" href="/admin/custom-fields?module={{ m }}">{{ m | capitalize }}</a>
+  </li>
+  {% endfor %}
+</ul>
+
+<div class="card">
+  <div class="table-responsive-hal">
+    <table class="table table-hal table-striped mb-0 align-middle">
+      <thead>
+        <tr>
+          <th style="width:70px;">Order</th>
+          <th>Field Label</th>
+          <th>Internal Name</th>
+          <th>Type</th>
+          <th>Required</th>
+          <th>Visible</th>
+          <th>Options</th>
+          <th style="width:220px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for field in fields %}
+        <tr>
+          <td>
+            <form method="post" action="/admin/custom-fields/{{ field.id }}/move" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="module" value="{{ module }}">
+              <input type="hidden" name="direction" value="up">
+              <button class="btn btn-sm btn-light" type="submit" title="Move up"><i class="bi bi-arrow-up"></i></button>
+            </form>
+            <form method="post" action="/admin/custom-fields/{{ field.id }}/move" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="module" value="{{ module }}">
+              <input type="hidden" name="direction" value="down">
+              <button class="btn btn-sm btn-light" type="submit" title="Move down"><i class="bi bi-arrow-down"></i></button>
+            </form>
+          </td>
+          <td>{{ field.field_label }}</td>
+          <td><code>{{ field.field_name }}</code></td>
+          <td><span class="badge text-bg-secondary">{{ field.field_type }}</span></td>
+          <td>{% if field.is_required %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-dash text-muted"></i>{% endif %}</td>
+          <td>{% if field.is_visible %}<i class="bi bi-eye text-success"></i>{% else %}<i class="bi bi-eye-slash text-muted"></i>{% endif %}</td>
+          <td class="small text-muted">{{ field.options_list | join(', ') if field.field_type == 'dropdown' else '—' }}</td>
+          <td>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editFieldModal{{ field.id }}" title="Edit"><i class="bi bi-pencil"></i></button>
+            <form method="post" action="/admin/custom-fields/{{ field.id }}/delete" class="d-inline" data-confirm="Delete field '{{ field.field_label }}'? Existing data will be preserved but hidden.">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="module" value="{{ module }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit" title="Delete"><i class="bi bi-trash3"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No custom fields defined for {{ module }} yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Field Modal -->
+<div class="modal fade" id="addFieldModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/admin/custom-fields">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="module" value="{{ module }}">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Field — {{ module | capitalize }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Field Name (internal) <span class="required-marker">*</span></label>
+            <input type="text" class="form-control" name="field_name" placeholder="project_manager" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Field Label (display) <span class="required-marker">*</span></label>
+            <input type="text" class="form-control" name="field_label" placeholder="Project Manager" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Field Type <span class="required-marker">*</span></label>
+            <select class="form-select field-type-select" name="field_type" required>
+              {% for ft in field_types %}
+              <option value="{{ ft }}">{{ ft | capitalize }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3 dropdown-options-wrap" style="display:none;">
+            <label class="form-label">Options (JSON list, dropdown only)</label>
+            <input type="text" class="form-control" name="options" placeholder='["Option 1", "Option 2"]'>
+          </div>
+          <div class="row">
+            <div class="col-6 mb-3">
+              <label class="form-label">Field Order</label>
+              <input type="number" class="form-control" name="field_order" value="{{ fields | length }}">
+            </div>
+            <div class="col-6 mb-3 d-flex align-items-end gap-3">
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" name="is_required" value="true" id="addIsRequired">
+                <label class="form-check-label" for="addIsRequired">Required</label>
+              </div>
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" name="is_visible" value="true" id="addIsVisible" checked>
+                <label class="form-check-label" for="addIsVisible">Visible</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Field</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Field Modals -->
+{% for field in fields %}
+<div class="modal fade" id="editFieldModal{{ field.id }}" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/admin/custom-fields/{{ field.id }}/edit">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="module" value="{{ module }}">
+        <div class="modal-header">
+          <h5 class="modal-title">Edit Field — {{ field.field_label }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Field Name (internal) <span class="required-marker">*</span></label>
+            <input type="text" class="form-control" name="field_name" value="{{ field.field_name }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Field Label (display) <span class="required-marker">*</span></label>
+            <input type="text" class="form-control" name="field_label" value="{{ field.field_label }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Field Type <span class="required-marker">*</span></label>
+            <select class="form-select field-type-select" name="field_type" required>
+              {% for ft in field_types %}
+              <option value="{{ ft }}" {{ 'selected' if field.field_type == ft }}>{{ ft | capitalize }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3 dropdown-options-wrap" style="{{ 'display:block;' if field.field_type == 'dropdown' else 'display:none;' }}">
+            <label class="form-label">Options (JSON list, dropdown only)</label>
+            <input type="text" class="form-control" name="options" value='{{ field.options or "" }}'>
+          </div>
+          <div class="row">
+            <div class="col-6 mb-3">
+              <label class="form-label">Field Order</label>
+              <input type="number" class="form-control" name="field_order" value="{{ field.field_order }}">
+            </div>
+            <div class="col-6 mb-3 d-flex align-items-end gap-3">
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" name="is_required" value="true" id="editIsRequired{{ field.id }}" {{ 'checked' if field.is_required }}>
+                <label class="form-check-label" for="editIsRequired{{ field.id }}">Required</label>
+              </div>
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" name="is_visible" value="true" id="editIsVisible{{ field.id }}" {{ 'checked' if field.is_visible }}>
+                <label class="form-check-label" for="editIsVisible{{ field.id }}">Visible</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

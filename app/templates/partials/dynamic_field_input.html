@@ -1,0 +1,43 @@
+{% macro render_dynamic_field(field, value) %}
+  {% set name = 'custom_field_' ~ field.id %}
+  <div class="mb-3">
+    <label for="{{ name }}" class="form-label">
+      {{ field.field_label }}
+      {% if field.is_required %}<span class="required-marker">*</span>{% endif %}
+    </label>
+    {% if field.field_type == 'textarea' %}
+      <textarea class="form-control" id="{{ name }}" name="{{ name }}" rows="2" {{ 'required' if field.is_required }}>{{ value or '' }}</textarea>
+    {% elif field.field_type == 'dropdown' %}
+      <select class="form-select" id="{{ name }}" name="{{ name }}" {{ 'required' if field.is_required }}>
+        <option value="">-- Select --</option>
+        {% for opt in field.options_list %}
+        <option value="{{ opt }}" {{ 'selected' if value == opt }}>{{ opt }}</option>
+        {% endfor %}
+      </select>
+    {% elif field.field_type == 'checkbox' %}
+      <div class="form-check">
+        <input type="checkbox" class="form-check-input" id="{{ name }}" name="{{ name }}" value="true" {{ 'checked' if value == 'true' }}>
+      </div>
+    {% elif field.field_type in ('number', 'currency') %}
+      <input type="number" step="0.01" class="form-control" id="{{ name }}" name="{{ name }}" value="{{ value or '' }}" {{ 'required' if field.is_required }}>
+    {% elif field.field_type == 'date' %}
+      <input type="date" class="form-control" id="{{ name }}" name="{{ name }}" value="{{ value or '' }}" {{ 'required' if field.is_required }}>
+    {% elif field.field_type == 'email' %}
+      <input type="email" class="form-control" id="{{ name }}" name="{{ name }}" value="{{ value or '' }}" {{ 'required' if field.is_required }}>
+    {% elif field.field_type == 'phone' %}
+      <input type="tel" class="form-control" id="{{ name }}" name="{{ name }}" value="{{ value or '' }}" {{ 'required' if field.is_required }}>
+    {% else %}
+      <input type="text" class="form-control" id="{{ name }}" name="{{ name }}" value="{{ value or '' }}" {{ 'required' if field.is_required }}>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro render_dynamic_cell(field, value) %}
+  {% if field.field_type == 'checkbox' %}
+    {% if value == 'true' %}<i class="bi bi-check-square text-success"></i>{% else %}<i class="bi bi-dash-square text-muted"></i>{% endif %}
+  {% elif field.field_type in ('currency',) %}
+    {{ value | inr if value else '' }}
+  {% else %}
+    {{ value or '' }}
+  {% endif %}
+{% endmacro %}

@@ -1,0 +1,9 @@
+{% macro render_export_bar(base_url, query='', print_label='Print') %}
+<div class="export-bar d-flex gap-2">
+  <a class="btn btn-sm btn-outline-success" href="{{ base_url }}/export/csv?{{ query }}"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+  <a class="btn btn-sm btn-outline-danger" href="{{ base_url }}/export/pdf?{{ query }}"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
+  <a class="btn btn-sm btn-outline-primary" href="{{ base_url }}/export/excel?{{ query }}"><i class="bi bi-filetype-xlsx me-1"></i>Excel</a>
+  <a class="btn btn-sm btn-outline-info" href="{{ base_url }}/export/word?{{ query }}"><i class="bi bi-filetype-docx me-1"></i>Word</a>
+  <button class="btn btn-sm btn-outline-dark" onclick="window.print()"><i class="bi bi-printer me-1"></i>{{ print_label }}</button>
+</div>
+{% endmacro %}
