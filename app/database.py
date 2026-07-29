@@ -87,6 +87,50 @@ def _ensure_admin_exists() -> None:
         db.close()
 
 
+DEFAULT_ADMIN_EMAIL = "admin@hal.internal"
+DEFAULT_ADMIN_PASSWORD = "Admin@123"
+
+
+def _ensure_default_admin_user() -> None:
+    """Create the default admin account on a brand-new deployment.
+
+    Render (and any other fresh environment) starts from an empty database, so
+    ``_ensure_admin_exists`` below has no existing user to promote and nobody could
+    log in. This only inserts a row when no user with ``DEFAULT_ADMIN_EMAIL`` exists
+    yet — it never touches an existing account's password or other fields.
+    """
+    import logging
+
+    from app.models.user import ROLE_ADMIN, User
+    from app.utils.security import hash_secret
+
+    logger = logging.getLogger(__name__)
+    db = SessionLocal()
+    try:
+        existing = db.query(User).filter(User.email == DEFAULT_ADMIN_EMAIL).first()
+        if existing is not None:
+            return
+        db.add(
+            User(
+                name="Administrator",
+                email=DEFAULT_ADMIN_EMAIL,
+                password_hash=hash_secret(DEFAULT_ADMIN_PASSWORD),
+                role=ROLE_ADMIN,
+                security_question="What is your favorite aircraft?",
+                security_answer_hash=hash_secret("tejas"),
+                admin_pin_hash=hash_secret("1234"),
+            )
+        )
+        db.commit()
+        logger.warning(
+            "Seeded default admin account (%s) with the default password. "
+            "Log in and change the password immediately.",
+            DEFAULT_ADMIN_EMAIL,
+        )
+    finally:
+        db.close()
+
+
 def init_db() -> None:
     """Create all tables, apply SQLite pragmas, and upgrade any existing schema in place."""
     from sqlalchemy import event
@@ -102,4 +146,5 @@ def init_db() -> None:
 
     Base.metadata.create_all(bind=engine)
     _upgrade_schema()
+    _ensure_default_admin_user()
     _ensure_admin_exists()

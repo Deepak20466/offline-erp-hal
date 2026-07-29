@@ -7,7 +7,7 @@ import random
 from datetime import date, timedelta
 from decimal import Decimal
 
-from app.database import SessionLocal, init_db
+from app.database import DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, SessionLocal, init_db
 from app.models.client import Client
 from app.models.contract import Contract
 from app.models.custom_field import CustomField
@@ -51,13 +51,13 @@ LINE_ITEM_DESCRIPTIONS = [
 
 
 def seed_users(db) -> User:
-    existing = db.query(User).filter(User.email == "admin@hal.internal").first()
+    existing = db.query(User).filter(User.email == DEFAULT_ADMIN_EMAIL).first()
     if existing:
         return existing
     user = User(
         name="Administrator",
-        email="admin@hal.internal",
-        password_hash=hash_secret("Admin@123"),
+        email=DEFAULT_ADMIN_EMAIL,
+        password_hash=hash_secret(DEFAULT_ADMIN_PASSWORD),
         role="admin",
         security_question="What is your favorite aircraft?",
         security_answer_hash=hash_secret("tejas"),
@@ -65,7 +65,7 @@ def seed_users(db) -> User:
     )
     db.add(user)
     db.flush()
-    print(f"Seeded admin user: {user.email} / password: Admin@123 / PIN: 1234")
+    print(f"Seeded admin user: {user.email} / password: {DEFAULT_ADMIN_PASSWORD} / PIN: 1234")
     return user
 
 
