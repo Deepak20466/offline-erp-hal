@@ -6,13 +6,17 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
 
-connect_args = {"check_same_thread": False} if "sqlite" in settings.database_url else {}
+is_sqlite = "sqlite" in settings.database_url
+connect_args = {"check_same_thread": False} if is_sqlite else {}
 
-engine = create_engine(
-    settings.database_url,
-    connect_args=connect_args,
-    pool_pre_ping=True,
-)
+engine_kwargs = {"connect_args": connect_args, "pool_pre_ping": True}
+if not is_sqlite:
+    # Supabase's pgbouncer transaction pooler caps concurrent server-side
+    # connections tightly (15 on the free tier) and closes idle ones, so keep
+    # the app-side pool small and recycle connections before Supabase does.
+    engine_kwargs.update(pool_size=5, max_overflow=5, pool_recycle=300)
+
+engine = create_engine(settings.database_url, **engine_kwargs)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -31,22 +35,26 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def _upgrade_schema() -> None:
-    """Add columns introduced by newer model versions to an already-existing SQLite file.
+    """Add columns introduced by newer model versions to an already-existing database.
 
     ``create_all`` only creates missing tables, it never alters existing ones, and this
     project has no Alembic migration chain — so on every startup we diff each mapped
-    table's columns against ``PRAGMA table_info`` and issue ``ALTER TABLE ADD COLUMN``
-    for anything missing. Safe to run every time: already-upgraded columns are skipped.
+    table's columns against the live database (via SQLAlchemy's dialect-agnostic
+    inspector, so this works for both SQLite and PostgreSQL) and issue
+    ``ALTER TABLE ADD COLUMN`` for anything missing. Safe to run every time:
+    already-upgraded columns are skipped, and no data is ever dropped or rewritten.
     """
+    from sqlalchemy import inspect
     from sqlalchemy.schema import CreateColumn
+
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
 
     with engine.begin() as conn:
         for table in Base.metadata.tables.values():
-            existing_columns = {
-                row[1] for row in conn.exec_driver_sql(f'PRAGMA table_info("{table.name}")').fetchall()
-            }
-            if not existing_columns:
+            if table.name not in existing_tables:
                 continue  # brand-new table — create_all already built it in full
+            existing_columns = {col["name"] for col in inspector.get_columns(table.name)}
             for column in table.columns:
                 if column.name in existing_columns:
                     continue
@@ -135,12 +143,14 @@ def init_db() -> None:
     """Create all tables, apply SQLite pragmas, and upgrade any existing schema in place."""
     from sqlalchemy import event
 
-    @event.listens_for(engine, "connect")
-    def _set_sqlite_pragma(dbapi_connection, connection_record) -> None:  # noqa: ANN001
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.close()
+    if engine.dialect.name == "sqlite":
+
+        @event.listens_for(engine, "connect")
+        def _set_sqlite_pragma(dbapi_connection, connection_record) -> None:  # noqa: ANN001
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.close()
 
     import app.models  # noqa: F401  (ensures all models are registered)
 

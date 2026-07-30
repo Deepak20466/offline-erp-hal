@@ -1,6 +1,8 @@
 """Application configuration loaded from environment variables with sane defaults."""
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,6 +29,28 @@ class Settings(BaseSettings):
     gst_default_percentage: float = 18.0
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalize_database_url(cls, value: str) -> str:
+        """Render's managed Postgres add-on (and Supabase) hands out a ``postgres://``
+        URL, but SQLAlchemy 2.x only recognizes the ``postgresql://`` scheme. Rewrite
+        it so ``DATABASE_URL`` from Render's environment works unmodified.
+
+        Also make sure Postgres connections (whether Supabase's direct host or the
+        pgbouncer transaction pooler) negotiate SSL, since Supabase requires it and
+        not every copy-pasted connection string includes ``sslmode`` explicitly.
+        """
+        if value.startswith("postgres://"):
+            value = "postgresql://" + value[len("postgres://") :]
+
+        if value.startswith("postgresql://") or value.startswith("postgresql+psycopg2://"):
+            parts = urlsplit(value)
+            query = dict(parse_qsl(parts.query))
+            query.setdefault("sslmode", "require")
+            value = urlunsplit(parts._replace(query=urlencode(query)))
+
+        return value
 
 
 settings = Settings()
