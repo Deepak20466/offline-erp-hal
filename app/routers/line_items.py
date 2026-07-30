@@ -8,7 +8,7 @@ from app.database import get_db
 from app.dependencies import check_csrf, require_login
 from app.models.user import User
 from app.schemas.line_item import LineItemCreate, LineItemUpdate
-from app.services import contract_service, custom_field_service, line_item_service
+from app.services import contract_service, custom_field_service, document_service, line_item_service
 from app.templating import render
 
 router = APIRouter(tags=["line-items"])
@@ -27,6 +27,7 @@ def contract_detail(
     items = line_item_service.list_line_items(db, contract_id)
     custom_fields = custom_field_service.list_fields(db, "contracts", only_visible=True)
     custom_values = custom_field_service.get_values_for_record(db, "contracts", contract_id)
+    documents = document_service.list_documents(db, contract_id)
     return render(
         request,
         "contracts/detail.html",
@@ -35,6 +36,7 @@ def contract_detail(
             "items": items,
             "custom_fields": custom_fields,
             "custom_values": custom_values,
+            "documents": documents,
         },
         user=user,
         active_nav="contracts",

@@ -1,17 +1,24 @@
 """Contract CRUD with exact column spec, dynamic fields, search, sort, export."""
+import io
+
 from fastapi import APIRouter, Depends, Form, Request
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
-from starlette.responses import RedirectResponse
+from starlette.responses import FileResponse, RedirectResponse, StreamingResponse
 
 from app.config import settings
 from app.database import get_db
 from app.dependencies import check_csrf, require_login
 from app.models.user import User
 from app.schemas.contract import ContractCreate, ContractUpdate
-from app.services import client_service, contract_service, custom_field_service
+from app.services import client_service, contract_service, custom_field_service, document_service, line_item_service
 from app.templating import render
-from app.utils.exporters import export_csv, export_excel, export_pdf, export_word
+from app.utils.exporters import build_excel_bytes, build_word_bytes, export_csv, export_excel, export_pdf, export_word
+
+DOCUMENT_MEDIA_TYPES = {
+    "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "word": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
 
 router = APIRouter(prefix="/contracts", tags=["contracts"])
 
@@ -36,6 +43,7 @@ def list_contracts(
     values_by_contract = custom_field_service.get_values_for_records(
         db, "contracts", [c.id for c in result.items]
     )
+    documents_by_contract = document_service.latest_documents_map(db, [c.id for c in result.items])
     return render(
         request,
         "contracts/list.html",
@@ -49,6 +57,7 @@ def list_contracts(
             "clients": clients,
             "custom_fields": custom_fields,
             "values_by_contract": values_by_contract,
+            "documents_by_contract": documents_by_contract,
         },
         user=user,
         active_nav="contracts",
@@ -92,6 +101,92 @@ def export_contracts(
     if fmt == "pdf":
         return export_pdf("contracts.pdf", "Contract Register", headers, rows)
     return RedirectResponse("/contracts?error=Unsupported+export+format", status_code=303)
+
+
+@router.get("/{contract_id}/documents/{fmt}")
+def export_contract_document(
+    contract_id: int,
+    fmt: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_login),
+):
+    """Generate an Excel/Word snapshot of one contract from current data, save it as a new
+    permanent version, and return it as a download — same download behaviour as any other
+    export, plus permanent storage on the side.
+
+    This is a one-way, point-in-time copy: it never re-opens or re-parses the saved file,
+    so edits made inside it afterwards can never reach the database, and later ERP changes
+    never touch a file already saved here. If nothing changed since the last export for
+    this contract+format, the existing version is reused instead of writing a duplicate.
+    """
+    if fmt not in DOCUMENT_MEDIA_TYPES:
+        return RedirectResponse(f"/contracts/{contract_id}?error=Unsupported+document+format", status_code=303)
+
+    contract = contract_service.get_active_contract(db, contract_id)
+    if contract is None:
+        return RedirectResponse("/contracts?error=Contract+not+found", status_code=303)
+
+    items = line_item_service.list_line_items(db, contract_id)
+    headers = ["Description", "Quantity", "Unit Rate", "Amount", "Status"]
+    rows = [
+        [item.description, float(item.quantity), float(item.unit_rate), float(item.amount), item.status]
+        for item in items
+    ]
+
+    if fmt == "excel":
+        content = build_excel_bytes(headers, rows, sheet_name="Line Items")
+    else:
+        content = build_word_bytes(f"Contract {contract.contract_number}", headers, rows)
+
+    document = document_service.save_document_version(
+        db, contract.id, contract.contract_number, fmt, content, created_by_id=user.id
+    )
+    db.commit()
+
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type=DOCUMENT_MEDIA_TYPES[fmt],
+        headers={"Content-Disposition": f'attachment; filename="{document.original_filename}"'},
+    )
+
+
+@router.get("/document/{document_id}")
+def view_contract_document(
+    document_id: int,
+    mode: str = "view",
+    db: Session = Depends(get_db),
+    user: User = Depends(require_login),
+):
+    """Open a previously saved Excel/Word file exactly as it was generated — no regeneration.
+
+    ``mode=view`` streams it inline (View Excel/Word); ``mode=download`` forces a
+    save-as download (Download Excel/Word). Blocked while the owning contract is in the
+    recycle bin — access resumes automatically once the contract is restored, since this
+    re-checks ``get_active_contract`` on every request rather than caching anything.
+    """
+    document = document_service.get_document(db, document_id)
+    if document is None:
+        return RedirectResponse("/contracts?error=Document+not+found", status_code=303)
+
+    contract = contract_service.get_active_contract(db, document.contract_id)
+    if contract is None:
+        return RedirectResponse(
+            "/contracts?error=This+document%27s+contract+is+in+the+recycle+bin", status_code=303
+        )
+
+    file_path = document_service.resolve_path(document)
+    if not file_path.exists():
+        return RedirectResponse(
+            f"/contracts/{document.contract_id}?error=Saved+file+is+missing+on+disk", status_code=303
+        )
+
+    disposition = "inline" if mode == "view" else "attachment"
+    return FileResponse(
+        file_path,
+        media_type=DOCUMENT_MEDIA_TYPES[document.doc_type],
+        filename=document.original_filename,
+        content_disposition_type=disposition,
+    )
 
 
 @router.post("")

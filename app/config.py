@@ -8,11 +8,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 EXPORTS_DIR = BASE_DIR / "exports"
-CONTRACT_FILES_DIR = DATA_DIR / "contract_files"
 
 DATA_DIR.mkdir(exist_ok=True)
 EXPORTS_DIR.mkdir(exist_ok=True)
-CONTRACT_FILES_DIR.mkdir(exist_ok=True)
 
 
 class Settings(BaseSettings):
@@ -27,6 +25,12 @@ class Settings(BaseSettings):
     page_size: int = 50
     company_name: str = "Hindustan Aeronautics Limited"
     gst_default_percentage: float = 18.0
+    # Base folder for permanently saved Excel/Word documents. Defaults to a local
+    # folder (fine for the offline/single-machine deployment this app targets), but
+    # on Render this MUST be overridden to a path under an attached Persistent Disk
+    # mount — Render's default filesystem is wiped on every deploy/restart, so
+    # without a real disk behind this path, saved documents would silently vanish.
+    document_storage_dir: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -54,3 +58,8 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Resolved after `settings` so DOCUMENT_STORAGE_DIR (env/.env) can override the
+# default local path — e.g. point it at a Render Persistent Disk's mount path.
+CONTRACT_FILES_DIR = Path(settings.document_storage_dir) if settings.document_storage_dir else DATA_DIR / "contract_files"
+CONTRACT_FILES_DIR.mkdir(parents=True, exist_ok=True)

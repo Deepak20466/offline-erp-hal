@@ -8,6 +8,8 @@
 {% block content %}
 {% call ph.render_page_header(contract.contract_number, subtitle=contract.client.name, icon='bi-file-earmark-text') %}
   <a href="/contracts" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Contracts</a>
+  <a href="/contracts/{{ contract.id }}/documents/excel" class="btn btn-outline-primary" title="Export current data to Excel and save it permanently"><i class="bi bi-filetype-xlsx me-1"></i>Export Excel</a>
+  <a href="/contracts/{{ contract.id }}/documents/word" class="btn btn-outline-info" title="Export current data to Word and save it permanently"><i class="bi bi-filetype-docx me-1"></i>Export Word</a>
   <a href="/invoices/new?contract_id={{ contract.id }}" class="btn btn-primary"><i class="bi bi-receipt-cutoff me-1"></i>Generate Invoice</a>
 {% endcall %}
 
@@ -47,6 +49,56 @@
         {% endif %}
       </div>
     </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">Saved Documents</div>
+  <div class="card-body">
+    <p class="text-muted small mb-2">
+      Each "Export Excel" / "Export Word" click above saves a new version of this contract as a
+      standalone file. These files are independent of the dashboard — editing them does not change
+      ERP data, and later dashboard changes do not update files already saved here.
+    </p>
+    {% if documents %}
+    <div class="table-responsive-hal">
+      <table class="table table-sm table-hal mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Version</th>
+            <th>Saved</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in documents %}
+          <tr>
+            <td>
+              {% if doc.doc_type == 'excel' %}
+              <i class="bi bi-filetype-xlsx text-primary me-1"></i>Excel
+              {% else %}
+              <i class="bi bi-filetype-docx text-info me-1"></i>Word
+              {% endif %}
+            </td>
+            <td>v{{ doc.version }}</td>
+            <td class="text-muted small">{{ doc.created_at | fdate('%d-%b-%Y %H:%M') }}</td>
+            <td>
+              <a href="/contracts/document/{{ doc.id }}?mode=view" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-eye me-1"></i>View
+              </a>
+              <a href="/contracts/document/{{ doc.id }}?mode=download" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-download me-1"></i>Download
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">No documents saved yet. Use "Export Excel" or "Export Word" above.</p>
+    {% endif %}
   </div>
 </div>
 

@@ -40,10 +40,8 @@ def export_csv(filename: str, headers: Sequence[str], rows: Sequence[Sequence]) 
     )
 
 
-def export_excel(
-    filename: str, headers: Sequence[str], rows: Sequence[Sequence], sheet_name: str = "Sheet1"
-) -> StreamingResponse:
-    """Stream a formatted .xlsx workbook built with pandas + openpyxl."""
+def build_excel_bytes(headers: Sequence[str], rows: Sequence[Sequence], sheet_name: str = "Sheet1") -> bytes:
+    """Build a formatted .xlsx workbook with pandas + openpyxl and return its raw bytes."""
     df = pd.DataFrame(rows, columns=list(headers))
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
@@ -58,18 +56,23 @@ def export_excel(
         for col_idx, header in enumerate(headers, start=1):
             max_len = max([len(str(header))] + [len(str(row[col_idx - 1])) for row in rows]) if rows else len(str(header))
             worksheet.column_dimensions[get_column_letter(col_idx)].width = min(max(max_len + 2, 10), 50)
-    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def export_excel(
+    filename: str, headers: Sequence[str], rows: Sequence[Sequence], sheet_name: str = "Sheet1"
+) -> StreamingResponse:
+    """Stream a formatted .xlsx workbook built with pandas + openpyxl."""
+    content = build_excel_bytes(headers, rows, sheet_name)
     return StreamingResponse(
-        buffer,
+        io.BytesIO(content),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers=_content_disposition(filename),
     )
 
 
-def export_word(
-    filename: str, title: str, headers: Sequence[str], rows: Sequence[Sequence]
-) -> StreamingResponse:
-    """Stream a .docx document containing a formatted table, with the HAL letterhead logo."""
+def build_word_bytes(title: str, headers: Sequence[str], rows: Sequence[Sequence]) -> bytes:
+    """Build a .docx document containing a formatted table, with the HAL letterhead logo, and return its raw bytes."""
     document = Document()
     logo_paragraph = document.add_paragraph()
     logo_paragraph.add_run().add_picture(LOGO_PATH, width=Inches(1.0))
@@ -89,9 +92,16 @@ def export_word(
             cells[idx].text = "" if value is None else str(value)
     buffer = io.BytesIO()
     document.save(buffer)
-    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def export_word(
+    filename: str, title: str, headers: Sequence[str], rows: Sequence[Sequence]
+) -> StreamingResponse:
+    """Stream a .docx document containing a formatted table, with the HAL letterhead logo."""
+    content = build_word_bytes(title, headers, rows)
     return StreamingResponse(
-        buffer,
+        io.BytesIO(content),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers=_content_disposition(filename),
     )
