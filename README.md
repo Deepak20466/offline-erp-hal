@@ -379,7 +379,6 @@ sane defaults, and can be overridden by copying `.env.example` to `.env`
 
 - Automated test suite (unit + integration) — currently validated manually
   (see `.github/workflows/ci.yml` for the current build/import smoke check).
-- A project license — none is set yet; see the note below.
 - Alembic-based migrations for more complex schema evolution.
 - macOS/Linux desktop packaging (currently Windows-only via PyInstaller +
   Inno Setup; the desktop app itself runs cross-platform under pywebview,
@@ -391,12 +390,12 @@ sane defaults, and can be overridden by copying `.env.example` to `.env`
 
 ## License
 
-No license file is currently set — until one is added, default copyright
-applies (all rights reserved), even though this repository and its
+**Proprietary — All Rights Reserved.** This repository and its
 [releases](https://github.com/Deepak20466/offline-erp-hal/releases) are
-public. If you intend for others to use, modify, or redistribute this
-project, add a `LICENSE` file (MIT and Apache 2.0 are common permissive
-choices for a project like this).
+public for viewing purposes only. No permission is granted to use, copy,
+modify, distribute, or create derivative works from this source code or
+its compiled binaries without prior written consent from the copyright
+holder. See [`LICENSE`](LICENSE) for the full terms.
 
 ## Author
 
