@@ -1,7 +1,7 @@
 """Contract CRUD with exact column spec, dynamic fields, search, sort, export."""
 import io
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Request, UploadFile
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from starlette.responses import FileResponse, RedirectResponse, StreamingResponse
@@ -182,6 +182,49 @@ def open_contract_document(
         filename=f"{contract.contract_number}_{label}.{extension}",
         content_disposition_type="attachment",
     )
+
+
+@router.post("/{contract_id}/view/{fmt}/upload")
+async def upload_contract_document(
+    contract_id: int,
+    fmt: str,
+    file: UploadFile,
+    csrf_token: str = Form(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_login),
+):
+    """Replace this contract's permanent Excel/Word document with a user-uploaded file.
+
+    This is the only other thing (besides the first-ever download, which creates it)
+    allowed to change that file: an explicit, user-initiated "Upload Updated
+    Excel/Word". The uploaded bytes are written as-is to the same fixed path under the
+    same filename — this route never opens/parses the file, never writes anything to
+    the database, and never regenerates content from ERP data, so the Contract
+    Dashboard stays completely independent of whatever the file now contains.
+    """
+    check_csrf(csrf_token)
+
+    if fmt not in DOCUMENT_MEDIA_TYPES:
+        return RedirectResponse("/contracts?error=Unsupported+document+format", status_code=303)
+
+    contract = contract_service.get_active_contract(db, contract_id)
+    if contract is None:
+        return RedirectResponse("/contracts?error=Contract+not+found", status_code=303)
+
+    expected_extension = document_service.EXTENSION_BY_TYPE[fmt]
+    if not (file.filename or "").lower().endswith(f".{expected_extension}"):
+        return RedirectResponse(
+            f"/contracts?error=Please+upload+a+.{expected_extension}+file", status_code=303
+        )
+
+    content = await file.read()
+    if not content:
+        return RedirectResponse("/contracts?error=Uploaded+file+is+empty", status_code=303)
+
+    document_service.replace_canonical_document(contract_id, fmt, content)
+
+    label = "Excel" if fmt == "excel" else "Word"
+    return RedirectResponse(f"/contracts?success={label}+document+updated", status_code=303)
 
 
 @router.get("/document/{document_id}")

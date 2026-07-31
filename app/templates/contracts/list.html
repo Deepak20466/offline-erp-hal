@@ -277,6 +277,13 @@
           </span>
           <i class="bi bi-download doc-tile-chevron"></i>
         </a>
+        <form method="post" action="/contracts/{{ contract.id }}/view/excel/upload" enctype="multipart/form-data" class="doc-upload">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="doc-upload-btn">
+            <i class="bi bi-upload"></i>Upload Updated Excel
+            <input type="file" name="file" accept=".xlsx" class="doc-upload-input" onchange="this.form.requestSubmit()">
+          </label>
+        </form>
 
         <a href="/contracts/{{ contract.id }}/view/word" rel="noopener" class="doc-tile doc-tile-word js-open-local-document" data-contract-id="{{ contract.id }}" data-doc-type="word">
           <span class="doc-tile-icon"><i class="bi bi-filetype-docx"></i></span>

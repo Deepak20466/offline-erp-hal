@@ -437,9 +437,34 @@ a:hover { color: var(--hal-primary-dark); }
   text-decoration: none;
   cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
-}
-.doc-tile + .doc-tile {
   margin-top: 0.9rem;
+}
+.doc-view-body > *:first-child {
+  margin-top: 0;
+}
+.doc-upload {
+  margin: 0.5rem 0 0;
+}
+.doc-upload-input {
+  display: none;
+}
+.doc-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--hal-text-muted);
+  padding: 0.4rem 0.8rem;
+  border: 1px dashed var(--hal-border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.doc-upload-btn:hover {
+  color: var(--hal-primary);
+  border-color: var(--hal-primary-light);
+  background-color: var(--hal-primary-soft);
 }
 .doc-tile:hover,
 .doc-tile:focus-visible {

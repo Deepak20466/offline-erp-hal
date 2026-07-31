@@ -133,6 +133,22 @@ def ensure_canonical_document(db: Session, contract: Contract, doc_type: str) ->
     return file_path
 
 
+def replace_canonical_document(contract_id: int, doc_type: str, content: bytes) -> Path:
+    """Overwrite this contract's permanent View document with user-uploaded content.
+
+    Deliberately separate from ``ensure_canonical_document`` above, which only ever
+    writes once (on first creation) and otherwise leaves the file untouched. This is
+    the *only* other thing allowed to change that file after that: an explicit "Upload
+    Updated Excel/Word" action. It never reads the database and never regenerates
+    anything from ERP data — it just persists exactly the bytes given to it, at the
+    same fixed path (``canonical_document_path``), so the filename and contract
+    association never change, only the content.
+    """
+    file_path = canonical_document_path(contract_id, doc_type)
+    file_path.write_bytes(content)
+    return file_path
+
+
 def list_documents(db: Session, contract_id: int) -> list[ContractDocument]:
     stmt = (
         select(ContractDocument)
