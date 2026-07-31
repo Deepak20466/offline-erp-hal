@@ -24,6 +24,7 @@ import time
 import uvicorn
 import webview
 
+import main as main_module
 from app.database import SessionLocal
 from app.services import contract_service, document_service
 
@@ -83,7 +84,11 @@ class Api:
 
 
 def _run_server() -> None:
-    uvicorn.run("main:app", host=HOST, port=PORT, log_level="warning")
+    # Passing the app object directly (rather than the "main:app" import-string form)
+    # is behaviorally identical for uvicorn, but lets PyInstaller's static import
+    # analysis actually see and bundle main.py and everything it imports — a string
+    # reference is invisible to it and would silently produce a broken exe.
+    uvicorn.run(main_module.app, host=HOST, port=PORT, log_level="warning")
 
 
 def _wait_until_listening(host: str, port: int, timeout: float = 15.0) -> None:

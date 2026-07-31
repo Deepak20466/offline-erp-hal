@@ -10,3 +10,7 @@ exports/*
 !exports/.gitkeep
 .env
 *.log
+build/
+dist/
+Output/
+*.spec

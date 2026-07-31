@@ -5,10 +5,10 @@ from fastapi import Request
 from fastapi.templating import Jinja2Templates
 from starlette.responses import HTMLResponse
 
-from app.config import BASE_DIR
+from app.config import RESOURCE_DIR
 from app.utils.security import generate_csrf_token
 
-templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
+templates = Jinja2Templates(directory=str(RESOURCE_DIR / "app" / "templates"))
 
 
 def render(

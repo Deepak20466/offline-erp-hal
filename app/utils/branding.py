@@ -3,9 +3,9 @@ from functools import lru_cache
 
 from PIL import Image as PILImage
 
-from app.config import BASE_DIR
+from app.config import RESOURCE_DIR
 
-LOGO_PATH = str(BASE_DIR / "app" / "static" / "images" / "hal-logo.jpeg")
+LOGO_PATH = str(RESOURCE_DIR / "app" / "static" / "images" / "hal-logo.jpeg")
 
 
 @lru_cache(maxsize=1)

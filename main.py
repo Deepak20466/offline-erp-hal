@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import RedirectResponse
 
-from app.config import BASE_DIR, settings
+from app.config import RESOURCE_DIR, settings
 from app.database import init_db
 from app.routers import (
     auth,
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title=settings.app_name)
 
-app.mount("/static", StaticFiles(directory=str(BASE_DIR / "app" / "static")), name="static")
+app.mount("/static", StaticFiles(directory=str(RESOURCE_DIR / "app" / "static")), name="static")
 
 app.include_router(auth.router)
 app.include_router(dashboard.router)

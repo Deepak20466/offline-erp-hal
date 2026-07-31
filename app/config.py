@@ -1,11 +1,31 @@
 """Application configuration loaded from environment variables with sane defaults."""
+import sys
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+_SOURCE_ROOT = Path(__file__).resolve().parent.parent
+
+# Bundled, read-only app resources (Jinja templates, static CSS/JS/images). Under a
+# PyInstaller --onefile build these are unpacked into a fresh temporary folder every
+# time the exe starts (sys._MEIPASS) — fine, since nothing here is ever written to.
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    RESOURCE_DIR = Path(sys._MEIPASS)
+else:
+    RESOURCE_DIR = _SOURCE_ROOT
+
+# Persistent user data (database, saved Excel/Word documents). This must NEVER
+# resolve inside PyInstaller's temporary extraction folder — that folder is deleted
+# the instant the exe process exits, which would silently wipe the database and
+# every "permanent" contract document on every restart. When frozen, anchor this
+# next to the actual .exe file instead, so it survives restarts and reboots.
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).resolve().parent
+else:
+    BASE_DIR = _SOURCE_ROOT
+
 DATA_DIR = BASE_DIR / "data"
 EXPORTS_DIR = BASE_DIR / "exports"
 
