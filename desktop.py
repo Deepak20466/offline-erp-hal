@@ -103,6 +103,15 @@ def _wait_until_listening(host: str, port: int, timeout: float = 15.0) -> None:
 
 
 def main() -> None:
+    # pywebview blocks ALL browser-style downloads by default (ALLOW_DOWNLOADS=False
+    # out of the box, across every one of its backends) -- it treats itself as an app
+    # shell, not a browser. Every Export button (CSV/PDF/Excel/Word, every module) is a
+    # plain link relying on normal Content-Disposition: attachment download behavior,
+    # so without this, WebView2 silently cancels each one before it reaches disk. This
+    # is unrelated to View -> Excel/Word, which never goes through the browser download
+    # path at all -- it's intercepted client-side and opened via os.startfile() instead.
+    webview.settings["ALLOW_DOWNLOADS"] = True
+
     server_thread = threading.Thread(target=_run_server, daemon=True)
     server_thread.start()
     _wait_until_listening(HOST, PORT)
