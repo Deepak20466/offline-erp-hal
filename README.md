@@ -1,24 +1,51 @@
 # Offline ERP HAL — Contract & Invoice Management System
 
-A fully offline, self-contained ERP for managing clients, contracts, contract
-line items, selective invoicing, payments/ledger, and admin-configurable
-dynamic fields — built with FastAPI, SQLAlchemy (SQLite), and server-rendered
-Jinja2 + Bootstrap 5 templates.
+A self-contained ERP for managing clients, contracts, contract line items,
+selective invoicing, payments/ledger, and admin-configurable dynamic
+fields — built with FastAPI, SQLAlchemy, and server-rendered Jinja2 +
+Bootstrap 5 templates. Ships two ways: as a normal web app, and as a
+**native Windows desktop application** with a one-click installer.
+
+## Download
+
+**[⬇ Download the latest Windows installer](https://github.com/Deepak20466/offline-erp-hal/releases/latest)**
+(`BusinessERPSystemSetup.exe`) — no admin rights required, installs to your
+user profile, and launches the app as a real desktop window.
+
+See [Running as a Desktop App](#running-as-a-desktop-app-recommended) below
+for what that gets you, or [Installation & Setup](#installation--setup-from-source)
+to run from source instead.
+
+## Screenshots
+
+> Add screenshots to `docs/screenshots/` and reference them here, e.g.:
+> `![Dashboard](docs/screenshots/dashboard.png)`. None are committed yet —
+> this section is a placeholder until real screenshots are captured from a
+> running instance.
+
+| Login | Dashboard |
+|---|---|
+| _add screenshot_ | _add screenshot_ |
+
+| Contracts | Invoice Generation |
+|---|---|
+| _add screenshot_ | _add screenshot_ |
 
 ## Project Overview
 
-Offline ERP HAL is an internal back-office system designed for environments
-with no internet dependency at runtime. Every static asset (Bootstrap, icons,
-the HAL logo) is vendored locally under `app/static/` — there is **no CDN
-dependency**, no external API calls, and no cloud service requirement. The
-entire application — authentication, contracts, invoicing, payments, and
-reporting — runs against a local SQLite database and can be deployed on a
-single offline machine.
+Offline ERP HAL is an internal back-office system for a contract-to-cash
+workflow: create a client, raise a contract with line items, selectively
+invoice those line items, record payments against invoices, and export any
+of it (CSV/PDF/Excel/Word/A4 print) for audit or filing. Every static asset
+(Bootstrap, icons, the HAL logo) is vendored locally under `app/static/` —
+no CDN dependency, no external API calls required to run it.
 
-It was built for a contract-to-cash workflow: create a client, raise a
-contract with line items, selectively invoice those line items, record
-payments against invoices, and export any of it (CSV/PDF/Excel/Word/A4 print)
-for audit or filing.
+It runs equally well two ways:
+- **As a desktop app** (`desktop.py`, packaged via PyInstaller + Inno Setup)
+  — a native window, backed by the same FastAPI app, with direct
+  Excel/Word document opening (see [Document Management](#document-management)).
+- **As a normal web app** (`uvicorn main:app`) — for local dev, or hosted
+  behind Postgres/Supabase for a shared, multi-user deployment.
 
 ## Features
 
@@ -41,6 +68,17 @@ for audit or filing.
   + A4 print, restore.
 - **Line Items** — stored in the database (not Excel) per contract; drive
   selective invoicing.
+- **Document Management** — every contract can generate a versioned Excel/Word
+  export snapshot, *and* has one permanent Excel + one permanent Word document
+  that opens directly (no download) when running as the desktop app. See
+  [Document Management](#document-management) below for the full model.
+- **Desktop Application** — `python desktop.py` (or the installed exe) runs
+  the app in a native window via [pywebview](https://pywebview.flowrl.com/),
+  with a JS↔Python bridge that opens a contract's Excel/Word file directly
+  in Microsoft Excel/Word using `os.startfile()` — not a browser download.
+- **Windows Installer** — `installer.iss` (Inno Setup) builds a per-user
+  installer (no admin required) around the PyInstaller-built exe. See
+  [Building the Windows Installer](#building-the-windows-installer).
 - **Dynamic Field Manager** (admin-only) — add/edit/delete/reorder/hide
   custom fields per module (Contracts, Clients, Invoices) with 9 field types;
   changes apply instantly to tables and forms with no code changes.
@@ -59,31 +97,51 @@ for audit or filing.
   are immutable** too — admins void (with a mandatory reason) instead of
   deleting; voided payments stay visible in the payment history for audit.
 - **Recycle Bin** — view, restore, permanently delete, or empty soft-deleted
-  clients, contracts, and users. (Invoices/payments are intentionally excluded
-  — see Void & Reissue above.)
+  clients, contracts, and users (and their associated documents). Invoices/
+  payments are intentionally excluded — see Void & Reissue above.
 - **UI/UX** — dark/light theme toggle, loading states on form submission,
   bulk-select + bulk actions on list pages, toast notifications, confirmation
   dialogs, responsive layout.
 
-## Screenshots
+## Document Management
 
-> Placeholders — replace with actual screenshots once available.
+Contracts have **two independent, non-syncing** document mechanisms — this
+is deliberate, not an oversight:
 
-| Login | Dashboard |
-|---|---|
-| ![Login screen](docs/screenshots/login.png) | ![Dashboard](docs/screenshots/dashboard.png) |
+1. **Export (versioned snapshots)** — "Export Excel"/"Export Word" on a
+   contract's detail page generates a fresh file from current database data
+   and saves it as a new numbered version (`Contract_Excel_v1.xlsx`,
+   `_v2.xlsx`, ...). Every version stays downloadable. Re-exporting with no
+   data changes reuses the existing version instead of creating a duplicate.
+2. **View (one permanent file per contract)** — "View → Excel" / "View →
+   Word" opens **exactly one** permanent `.xlsx` and one permanent `.docx`
+   per contract, created the first time it's opened and **never
+   regenerated, overwritten, or reset** after that — regardless of later
+   contract edits or how many times it's reopened. When running as the
+   desktop app, this opens directly in Microsoft Excel/Word via
+   `os.startfile()`; in a plain browser tab it downloads instead, since a
+   browser cannot launch a desktop application (a platform limitation, not
+   a bug). An "Upload Updated Excel" control lets you push a locally-edited
+   copy back to the server, replacing that same permanent file.
 
-| Contracts | Invoice Generation |
-|---|---|
-| ![Contracts list](docs/screenshots/contracts.png) | ![Invoice generation](docs/screenshots/invoice.png) |
+**Independence is enforced in both directions, always:**
+- Dashboard/database edits never touch either document.
+- Editing the Excel/Word file (in Excel/Word itself, or via re-upload)
+  never touches the database — there is no import/read-back path anywhere
+  in the app.
+- Deleting a contract (recycle bin) blocks document access until restored;
+  permanently purging a contract deletes its documents too — the *only*
+  two ways any of these files are ever removed.
 
 ## Technology Stack
 
 | Layer | Technology |
 |---|---|
 | Backend framework | [FastAPI](https://fastapi.tiangolo.com/) (ASGI, Python 3.10+) |
-| ORM / Database | SQLAlchemy 2.0 + SQLite |
+| ORM / Database | SQLAlchemy 2.0 + SQLite (or PostgreSQL/Supabase for hosted deployments) |
 | Templates / UI | Jinja2 + Bootstrap 5 (vendored locally, no CDN) |
+| Desktop shell | [pywebview](https://pywebview.flowrl.com/) (native window + JS↔Python bridge) |
+| Packaging | [PyInstaller](https://pyinstaller.org/) (single-file exe) + [Inno Setup](https://jrsoftware.org/isinfo.php) (Windows installer) |
 | Auth & Sessions | Signed, stateless session cookies (`itsdangerous`), `passlib`/`bcrypt` password hashing |
 | Validation | Pydantic 2 / `pydantic-settings` |
 | Exports | `pandas` + `openpyxl` (Excel), `ReportLab` (PDF), `python-docx` (Word) |
@@ -93,13 +151,16 @@ for audit or filing.
 ## Folder Structure
 
 ```
-Hal/
-├── main.py                  # FastAPI app entrypoint (uvicorn main:app)
-├── seed.py                  # Database seeder (admin user + demo data)
+offline-erp-hal/
+├── main.py                  # FastAPI app (web mode: uvicorn main:app)
+├── desktop.py                # Desktop app entry point (python desktop.py)
+├── installer.iss              # Inno Setup script for the Windows installer
+├── seed.py                     # Database seeder (admin user + demo data)
 ├── requirements.txt
-├── data/                    # SQLite database file lives here
+├── .env.example                 # Template for local environment overrides
+├── data/                          # SQLite database + permanent documents live here
 ├── app/
-│   ├── config.py             # Settings (env-overridable)
+│   ├── config.py             # Settings (env-overridable) + frozen-exe-aware paths
 │   ├── database.py           # Engine/session/Base + init_db()
 │   ├── dependencies.py       # get_current_user / require_login / require_admin / CSRF check
 │   ├── templating.py         # Jinja2Templates + filters (inr, fdate) + render()
@@ -113,7 +174,24 @@ Hal/
 └── scripts/                            # One-off maintenance scripts
 ```
 
-## Installation & Setup
+## Running as a Desktop App (recommended)
+
+The easiest path is the [prebuilt installer](#download) — download, run it
+(no admin prompt), launch from the Start Menu.
+
+To run from source instead:
+
+```powershell
+pip install -r requirements.txt
+python desktop.py
+```
+
+This opens a native window (not a browser tab) running the same app. The
+one thing a browser genuinely cannot do — launch Microsoft Excel/Word
+directly against a specific local file — works here via a JS↔Python
+bridge and `os.startfile()`. See [Document Management](#document-management).
+
+## Installation & Setup (from source)
 
 ### Prerequisites
 
@@ -148,13 +226,50 @@ python seed.py
 
 This creates `data/hal_erp.db` with a seeded admin account and demo data.
 
-## Running the Application
+### 5. Run it
 
 ```powershell
 uvicorn main:app --reload
 ```
 
-Then open **http://127.0.0.1:8000** in your browser.
+Then open **http://127.0.0.1:8000** in your browser — or run `python
+desktop.py` instead for the native window experience.
+
+## Building the Windows Installer
+
+For maintainers who want to produce a new release build:
+
+```powershell
+pip install pyinstaller
+
+pyinstaller --onefile --windowed --name "Business ERP System" `
+  --add-data "app/templates;app/templates" `
+  --add-data "app/static;app/static" `
+  --hidden-import passlib.handlers.bcrypt `
+  desktop.py
+```
+
+This produces `dist\Business ERP System.exe`. Then compile the installer
+with [Inno Setup](https://jrsoftware.org/isdl.php):
+
+```powershell
+"C:\Program Files\Inno Setup 7\ISCC.exe" installer.iss
+```
+
+Output lands at `Output\BusinessERPSystemSetup.exe`. It installs per-user
+under `%LocalAppData%\Programs\Business ERP System` (no admin rights
+needed), and its uninstaller never touches the `data\` folder — business
+data always survives an uninstall.
+
+> **Why the extra flags matter:** PyInstaller's `--onefile` mode unpacks
+> into a temporary folder that's deleted the moment the exe closes, and its
+> static import analysis can miss both non-Python data files (templates/
+> static) and dynamically-loaded modules (`passlib`'s bcrypt handler). Skip
+> any of these flags and you'll get a broken build — either a crash on
+> startup, or (worse) a working app that silently loses its database and
+> documents on every restart. `app/config.py` handles the persistent-vs-
+> bundled path split; these flags handle what PyInstaller can't infer on
+> its own.
 
 ## Login Instructions
 
@@ -185,7 +300,7 @@ Role checks are enforced at the route/dependency layer (`app/dependencies.py`
 ## Project Architecture
 
 ```
-Browser (Jinja2 + Bootstrap 5, server-rendered)
+Desktop window (pywebview)  OR  Browser (Jinja2 + Bootstrap 5, server-rendered)
         │  HTML forms / links (no SPA, no client-side framework)
         ▼
 FastAPI routers (app/routers/)  ──►  Pydantic schemas (app/schemas/)
@@ -194,13 +309,14 @@ FastAPI routers (app/routers/)  ──►  Pydantic schemas (app/schemas/)
 Service layer (app/services/)  ◄────  Business logic / validation
         │
         ▼
-SQLAlchemy models (app/models/)  ──►  SQLite (data/hal_erp.db)
+SQLAlchemy models (app/models/)  ──►  SQLite / PostgreSQL
 ```
 
 - **Routers** handle HTTP concerns (auth, redirects, form parsing) and
   delegate to services.
 - **Services** own business rules — e.g., invoice totals, sales-journal
-  posting, void/reissue logic, soft-delete semantics.
+  posting, void/reissue logic, soft-delete semantics, document lifecycle
+  (`app/services/document_service.py`).
 - **Models** are SQLAlchemy 2.0 mapped classes; every table carries an
   `is_deleted` flag and timestamps via shared mixins (`app/models/mixins.py`).
 - **Dynamic fields** are stored generically in `custom_fields` /
@@ -210,7 +326,7 @@ SQLAlchemy models (app/models/)  ──►  SQLite (data/hal_erp.db)
   code changes.
 - **CSRF protection** uses stateless, signed, timestamped tokens
   (`itsdangerous`) embedded as a hidden field in every form — no server-side
-  session store is required, which fits the fully offline deployment model.
+  session store is required.
 - **Sessions are stateless but revocable** — the session cookie is a signed
   token embedding a `session_version`; changing a password (by the user or an
   admin resetting it) bumps that counter, instantly invalidating every other
@@ -218,12 +334,13 @@ SQLAlchemy models (app/models/)  ──►  SQLite (data/hal_erp.db)
 
 ## Database Setup
 
-- **Engine**: SQLite, file-based at `data/hal_erp.db` (created automatically
-  on first run).
+- **Engine**: SQLite by default, file-based at `data/hal_erp.db` (created
+  automatically on first run); PostgreSQL/Supabase supported via
+  `DATABASE_URL` for hosted deployments.
 - **No Alembic migration chain.** `init_db()` (in `app/database.py`) diffs
-  each SQLAlchemy model's columns against the live SQLite file via
-  `PRAGMA table_info` and adds any missing columns on every startup —
-  a "self-healing" schema.
+  each SQLAlchemy model's columns against the live database schema and adds
+  any missing columns on every startup — a "self-healing" schema, safe to
+  run repeatedly (never drops or rewrites existing data).
 - A companion startup check guarantees at least one `admin` account always
   exists (it promotes `admin@hal.internal`, or else the oldest account, if a
   schema upgrade would otherwise leave nobody with admin rights).
@@ -237,8 +354,8 @@ SQLAlchemy models (app/models/)  ──►  SQLite (data/hal_erp.db)
 ## Environment Variables
 
 All settings are defined in `app/config.py` (via `pydantic-settings`) with
-sane defaults, and can be overridden with an `.env` file in the project root
-or real environment variables:
+sane defaults, and can be overridden by copying `.env.example` to `.env`
+(gitignored — safe for real secrets) or via real environment variables:
 
 | Variable | Default | Description |
 |---|---|---|
@@ -251,6 +368,7 @@ or real environment variables:
 | `PAGE_SIZE` | `50` | Rows per page on list views |
 | `COMPANY_NAME` | `Hindustan Aeronautics Limited` | Name used on exports/letterheads |
 | `GST_DEFAULT_PERCENTAGE` | `18.0` | Default GST % applied on invoices |
+| `DOCUMENT_STORAGE_DIR` | *(unset — defaults to `data/contract_files`)* | Base folder for permanent Excel/Word documents. **Must** point at a mounted Persistent Disk if deployed to Render, or documents are lost on every redeploy. |
 
 > **Security note:** `SECRET_KEY` ships with a placeholder default. The app
 > logs a warning at startup if it detects the default value is still in use.
@@ -259,8 +377,13 @@ or real environment variables:
 
 ## Future Improvements
 
-- Automated test suite (unit + integration) — currently validated manually.
+- Automated test suite (unit + integration) — currently validated manually
+  (see `.github/workflows/ci.yml` for the current build/import smoke check).
+- A project license — none is set yet; see the note below.
 - Alembic-based migrations for more complex schema evolution.
+- macOS/Linux desktop packaging (currently Windows-only via PyInstaller +
+  Inno Setup; the desktop app itself runs cross-platform under pywebview,
+  just not yet packaged for those platforms).
 - Multi-currency support for invoicing.
 - Configurable GST/tax rules per client or contract.
 - Role granularity beyond Admin/Staff (e.g., read-only auditor role).
@@ -268,9 +391,12 @@ or real environment variables:
 
 ## License
 
-This project is provided for internal use. Add a license of your choice
-(e.g., MIT, Apache 2.0) here if the project is to be distributed or
-open-sourced.
+No license file is currently set — until one is added, default copyright
+applies (all rights reserved), even though this repository and its
+[releases](https://github.com/Deepak20466/offline-erp-hal/releases) are
+public. If you intend for others to use, modify, or redistribute this
+project, add a `LICENSE` file (MIT and Apache 2.0 are common permissive
+choices for a project like this).
 
 ## Author
 
