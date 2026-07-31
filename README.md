@@ -8,9 +8,11 @@ Bootstrap 5 templates. Ships two ways: as a normal web app, and as a
 
 ## Download
 
-**[⬇ Download the latest Windows installer](https://github.com/Deepak20466/offline-erp-hal/releases/latest)**
+**[⬇ Download v1.0.1 — Windows installer](https://github.com/Deepak20466/offline-erp-hal/releases/download/v1.0.1/BusinessERPSystemSetup.exe)**
 (`BusinessERPSystemSetup.exe`) — no admin rights required, installs to your
-user profile, and launches the app as a real desktop window.
+user profile, and launches the app as a real desktop window. See the
+[releases page](https://github.com/Deepak20466/offline-erp-hal/releases)
+for release notes and older versions.
 
 See [Running as a Desktop App](#running-as-a-desktop-app-recommended) below
 for what that gets you, or [Installation & Setup](#installation--setup-from-source)
