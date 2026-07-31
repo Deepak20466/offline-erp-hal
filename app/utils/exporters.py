@@ -3,21 +3,20 @@
 Every exporter takes the same shape of input — a list of column headers and a
 list of row tuples/lists of already-formatted strings — so any module (clients,
 contracts, invoice register, ...) can reuse them without bespoke code.
+
+pandas/docx/openpyxl/reportlab are each imported inside the specific builder
+function that needs them, not at module level. Every router imports this module
+at startup (to register its export routes), so a module-level import would pay
+the full cost of loading all four libraries — pandas alone pulls in numpy and
+is one of the slower imports in the Python ecosystem — on every app launch,
+even for a session that never clicks an export button. Deferring the import to
+first use only shifts *when* the cost is paid (first export of that format,
+then cached in sys.modules for the rest of the process); behavior is identical.
 """
 import csv
 import io
 from typing import Sequence
 
-import pandas as pd
-from docx import Document
-from docx.shared import Inches, Pt
-from openpyxl.styles import Font, PatternFill
-from openpyxl.utils import get_column_letter
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.units import mm
-from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
 from starlette.responses import StreamingResponse
 
 from app.utils.branding import LOGO_PATH, logo_dimensions_pt
@@ -42,6 +41,10 @@ def export_csv(filename: str, headers: Sequence[str], rows: Sequence[Sequence]) 
 
 def build_excel_bytes(headers: Sequence[str], rows: Sequence[Sequence], sheet_name: str = "Sheet1") -> bytes:
     """Build a formatted .xlsx workbook with pandas + openpyxl and return its raw bytes."""
+    import pandas as pd
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
     df = pd.DataFrame(rows, columns=list(headers))
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
@@ -73,6 +76,9 @@ def export_excel(
 
 def build_word_bytes(title: str, headers: Sequence[str], rows: Sequence[Sequence]) -> bytes:
     """Build a .docx document containing a formatted table, with the HAL letterhead logo, and return its raw bytes."""
+    from docx import Document
+    from docx.shared import Inches, Pt
+
     document = Document()
     logo_paragraph = document.add_paragraph()
     logo_paragraph.add_run().add_picture(LOGO_PATH, width=Inches(1.0))
@@ -116,6 +122,12 @@ def export_pdf(
     logo_width_px: int = 100,
 ) -> StreamingResponse:
     """Stream a landscape A4 PDF table report with the HAL letterhead logo by default."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,

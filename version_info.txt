@@ -1,0 +1,42 @@
+# UTF-8
+#
+# Windows version-info resource for "Business ERP System.exe", embedded via
+# PyInstaller's `version=` spec argument (see BusinessERPSystem.spec). This
+# populates the Details tab of the exe's file Properties dialog in Explorer
+# and is one of the signals Windows/AV reputation systems use to distinguish
+# a real, identifiable publisher from an anonymous binary.
+#
+# Keep FileVersion/ProductVersion here in sync with MyAppVersion in
+# installer.iss when bumping releases.
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 0, 1, 0),
+    prodvers=(1, 0, 1, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo(
+      [
+        StringTable(
+          u'040904B0',
+          [
+            StringStruct(u'CompanyName', u'K Deepak'),
+            StringStruct(u'FileDescription', u'Offline ERP HAL - Contract & Invoice Management System'),
+            StringStruct(u'FileVersion', u'1.0.1.0'),
+            StringStruct(u'InternalName', u'BusinessERPSystem'),
+            StringStruct(u'LegalCopyright', u'Copyright (C) K Deepak. All rights reserved.'),
+            StringStruct(u'OriginalFilename', u'Business ERP System.exe'),
+            StringStruct(u'ProductName', u'Business ERP System'),
+            StringStruct(u'ProductVersion', u'1.0.1.0')
+          ]
+        )
+      ]
+    ),
+    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+  ]
+)

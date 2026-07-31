@@ -1,0 +1,45 @@
+# Render Blueprint for Offline ERP HAL's web deployment.
+#
+# This deploys the exact same FastAPI app (main.py) the desktop exe embeds locally --
+# no code fork, no separate "web" codebase. Apply via Render's "New +" -> "Blueprint"
+# using this repo, or configure the equivalent by hand in the dashboard (see the
+# "Deploying to Render" section in README.md for the manual-setup checklist).
+#
+# Why a Persistent Disk is required: document_service.py writes each contract's one
+# permanent Excel/Word file under DOCUMENT_STORAGE_DIR. Render's web service
+# filesystem is otherwise ephemeral (wiped on every deploy/restart) -- without a real
+# disk mounted here, "View -> Excel/Word" would silently lose every saved document
+# the first time the service redeploys or restarts.
+services:
+  - type: web
+    name: offline-erp-hal
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /login
+    disk:
+      name: contract-files
+      mountPath: /var/data/contract_files
+      sizeGB: 1
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true # signs session cookies + CSRF tokens; never reuse the source default in production
+      - key: DEFAULT_ADMIN_PASSWORD
+        generateValue: true # seeded admin password on first deploy; retrieve it from the Environment tab after deploy, then change it via the app's own login/profile screens
+      - key: DATABASE_URL
+        fromDatabase:
+          name: offline-erp-hal-db
+          property: connectionString
+      - key: DOCUMENT_STORAGE_DIR
+        value: /var/data/contract_files
+      - key: COMPANY_NAME
+        value: Hindustan Aeronautics Limited
+      - key: GST_DEFAULT_PERCENTAGE
+        value: "18.0"
+
+databases:
+  - name: offline-erp-hal-db
+    plan: starter
+    databaseName: hal_erp
+    user: hal_erp

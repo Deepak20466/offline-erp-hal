@@ -254,19 +254,69 @@
       e.preventDefault();
       var contractId = parseInt(link.dataset.contractId, 10);
       var docType = link.dataset.docType;
-      console.log("[HAL] Calling desktop bridge open_document(" + contractId + ", " + docType + ")");
-      window.pywebview.api.open_document(contractId, docType).then(function (result) {
-        console.log("[HAL] open_document resolved:", result);
-        if (!result || !result.ok) {
-          showToast("Could not open document: " + ((result && result.error) || "unknown error"), "error");
-        }
-      }).catch(function (err) {
-        // Without this .catch, any unexpected Python-side exception rejects this
-        // promise silently — nothing shows on screen even though the bridge call
-        // genuinely failed. This is what makes failures visible going forward.
-        console.error("[HAL] open_document bridge call threw:", err);
-        showToast("Could not open document: " + (err && err.message ? err.message : "bridge error — see console"), "error");
-      });
+
+      // Local mode: this window shows the app's own embedded server (127.0.0.1),
+      // which shares this same process's disk -- the bridge can resolve and open
+      // the canonical file directly, exactly as before OPEN_EXTERNAL_LINKS_IN_BROWSER/
+      // hosted-backend support existed.
+      var isLocalEmbeddedServer = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost";
+
+      if (isLocalEmbeddedServer) {
+        console.log("[HAL] Calling desktop bridge open_document(" + contractId + ", " + docType + ")");
+        window.pywebview.api.open_document(contractId, docType).then(function (result) {
+          console.log("[HAL] open_document resolved:", result);
+          if (!result || !result.ok) {
+            showToast("Could not open document: " + ((result && result.error) || "unknown error"), "error");
+          }
+        }).catch(function (err) {
+          // Without this .catch, any unexpected Python-side exception rejects this
+          // promise silently — nothing shows on screen even though the bridge call
+          // genuinely failed. This is what makes failures visible going forward.
+          console.error("[HAL] open_document bridge call threw:", err);
+          showToast("Could not open document: " + (err && err.message ? err.message : "bridge error — see console"), "error");
+        });
+        return;
+      }
+
+      // Remote mode: this window shows a hosted backend, so the canonical file lives
+      // on that server's disk, not this machine's. Fetch it the same way a plain
+      // browser tab already would (same route, same auth, cookies attached
+      // automatically since it's a same-origin request) and hand the bytes to the
+      // bridge purely so it can save a local temp copy and open it with the OS's
+      // associated app.
+      console.log("[HAL] Remote backend detected — fetching document via HTTP before opening locally.");
+      fetch("/contracts/" + contractId + "/view/" + docType, { credentials: "same-origin" })
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error("Server returned HTTP " + response.status);
+          }
+          return response.blob();
+        })
+        .then(function (blob) {
+          return new Promise(function (resolve, reject) {
+            var reader = new FileReader();
+            reader.onloadend = function () {
+              // reader.result is "data:<mime>;base64,AAAA..." -- the bridge only needs
+              // the part after the comma.
+              resolve(reader.result.split(",")[1]);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        })
+        .then(function (base64Data) {
+          return window.pywebview.api.save_and_open_document(docType, base64Data);
+        })
+        .then(function (result) {
+          console.log("[HAL] save_and_open_document resolved:", result);
+          if (!result || !result.ok) {
+            showToast("Could not open document: " + ((result && result.error) || "unknown error"), "error");
+          }
+        })
+        .catch(function (err) {
+          console.error("[HAL] remote document fetch/open failed:", err);
+          showToast("Could not open document: " + (err && err.message ? err.message : "fetch error — see console"), "error");
+        });
     });
   }
 

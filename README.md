@@ -239,23 +239,23 @@ desktop.py` instead for the native window experience.
 
 ## Building the Windows Installer
 
-For maintainers who want to produce a new release build:
+For maintainers who want to produce a new release build. The build is
+defined by a committed PyInstaller spec (`BusinessERPSystem.spec`) rather
+than an ad-hoc CLI command, so every release is built the same way from
+source control instead of whatever flags happen to be typed that day:
 
 ```powershell
-pip install pyinstaller
+pip install -r requirements-build.txt
 
-pyinstaller --onefile --windowed --name "Business ERP System" `
-  --add-data "app/templates;app/templates" `
-  --add-data "app/static;app/static" `
-  --hidden-import passlib.handlers.bcrypt `
-  desktop.py
+pyinstaller BusinessERPSystem.spec
 ```
 
-This produces `dist\Business ERP System.exe`. Then compile the installer
-with [Inno Setup](https://jrsoftware.org/isdl.php):
+This produces `dist\Business ERP System.exe` — same output path and name as
+before, so the installer step below is unchanged. Then compile the
+installer with [Inno Setup](https://jrsoftware.org/isdl.php):
 
 ```powershell
-"C:\Program Files\Inno Setup 7\ISCC.exe" installer.iss
+ISCC.exe installer.iss
 ```
 
 Output lands at `Output\BusinessERPSystemSetup.exe`. It installs per-user
@@ -263,15 +263,40 @@ under `%LocalAppData%\Programs\Business ERP System` (no admin rights
 needed), and its uninstaller never touches the `data\` folder — business
 data always survives an uninstall.
 
-> **Why the extra flags matter:** PyInstaller's `--onefile` mode unpacks
-> into a temporary folder that's deleted the moment the exe closes, and its
-> static import analysis can miss both non-Python data files (templates/
-> static) and dynamically-loaded modules (`passlib`'s bcrypt handler). Skip
-> any of these flags and you'll get a broken build — either a crash on
-> startup, or (worse) a working app that silently loses its database and
-> documents on every restart. `app/config.py` handles the persistent-vs-
-> bundled path split; these flags handle what PyInstaller can't infer on
-> its own.
+> **Why the spec file matters:** it's the same build `--onefile --windowed
+> --name "Business ERP System" --add-data ... --hidden-import
+> passlib.handlers.bcrypt` command as before, just checked in instead of
+> retyped per release — see the comments at the top of
+> `BusinessERPSystem.spec` for why each of those pieces exists (the short
+> version: PyInstaller's static import analysis can miss both non-Python
+> data files and dynamically-loaded modules like `passlib`'s bcrypt
+> handler; skip them and you get a broken build). `app/config.py` handles
+> the persistent-vs-bundled path split at runtime; these are what
+> PyInstaller can't infer on its own.
+>
+> Two packaging additions beyond the original command, both purely
+> build-level and invisible to end users:
+> - **UPX is explicitly disabled** (`upx=False` in the spec). UPX-compressed
+>   executables are one of the most common antivirus false-positive
+>   triggers for legitimate PyInstaller apps — not worth the marginal size
+>   savings here.
+> - **A Windows version resource is embedded** (`version_info.txt`) —
+>   CompanyName, ProductName, FileDescription, FileVersion, and
+>   LegalCopyright now show up in the exe's Explorer Properties dialog
+>   instead of it looking like an anonymous binary. Keep `FileVersion`/
+>   `ProductVersion` there and `MyAppVersion` in `installer.iss` in sync
+>   when bumping releases.
+>
+> `pyinstaller` itself is pinned in `requirements-build.txt` (separate from
+> `requirements.txt`, since it's a build tool, not a runtime dependency) so
+> the same PyInstaller version — and therefore the same bootloader/output —
+> is used for every release.
+>
+> No custom `.ico` app icon is set yet — none currently exists in the repo
+> (only `app/static/images/hal-logo.jpeg`, which isn't a valid Windows exe
+> icon format). Convert that logo to `.ico` and set `icon='...'` in
+> `BusinessERPSystem.spec`'s `EXE(...)` block to add one; Inno Setup will
+> pick it up from the exe automatically, no installer changes needed.
 
 ## Login Instructions
 
@@ -371,11 +396,87 @@ sane defaults, and can be overridden by copying `.env.example` to `.env`
 | `COMPANY_NAME` | `Hindustan Aeronautics Limited` | Name used on exports/letterheads |
 | `GST_DEFAULT_PERCENTAGE` | `18.0` | Default GST % applied on invoices |
 | `DOCUMENT_STORAGE_DIR` | *(unset — defaults to `data/contract_files`)* | Base folder for permanent Excel/Word documents. **Must** point at a mounted Persistent Disk if deployed to Render, or documents are lost on every redeploy. |
+| `DESKTOP_BACKEND_URL` | *(unset)* | Desktop app only, ignored by the website. See [Connecting the Desktop App to a Hosted Backend](#connecting-the-desktop-app-to-a-hosted-backend). |
 
 > **Security note:** `SECRET_KEY` ships with a placeholder default. The app
 > logs a warning at startup if it detects the default value is still in use.
 > Always set a unique `SECRET_KEY` via `.env` before any real/production
 > deployment, since it signs both session cookies and CSRF tokens.
+
+## Deploying to Render
+
+The website and the desktop app are the same FastAPI codebase (`main.py`) —
+deploying to Render doesn't fork anything, it just runs that app with
+`DATABASE_URL` pointed at Postgres instead of the default local SQLite file.
+`render.yaml` in this repo describes the full setup as a Render Blueprint;
+apply it via **New +** → **Blueprint** in the Render dashboard, pointed at
+this repo, or configure the equivalent by hand:
+
+1. **Web service** — runtime: Python. Build command: `pip install -r
+   requirements.txt`. Start command: `uvicorn main:app --host 0.0.0.0 --port
+   $PORT`. Health check path: `/login`.
+2. **Postgres database** — create a Render Postgres instance and bind its
+   connection string to the web service's `DATABASE_URL`. `app/config.py`
+   already rewrites Render's `postgres://` scheme to the
+   `postgresql://` SQLAlchemy expects and adds `sslmode=require` if not
+   already present — no code changes needed for this.
+3. **Persistent Disk** — attach one and set `DOCUMENT_STORAGE_DIR` to its
+   mount path (e.g. `/var/data/contract_files`). Without this, every
+   permanent Excel/Word document is lost on the next deploy or restart,
+   since Render's web service filesystem is otherwise ephemeral.
+4. **Environment variables** — at minimum, set a real `SECRET_KEY` (Render's
+   Blueprint `generateValue: true` does this automatically) and
+   `DATABASE_URL`/`DOCUMENT_STORAGE_DIR` as above. `COMPANY_NAME` and
+   `GST_DEFAULT_PERCENTAGE` are optional overrides of their source defaults.
+
+No CORS configuration is needed: every page (whether opened in a normal
+browser or inside the desktop app's window) is served directly by this same
+FastAPI app — there's no separate JS-driven API client making cross-origin
+calls, so it's always a same-origin request either way.
+
+**Deployment checklist:**
+
+- [ ] Web service created, build/start commands set as above
+- [ ] Postgres database created and `DATABASE_URL` bound to it
+- [ ] Persistent Disk attached and `DOCUMENT_STORAGE_DIR` set to its mount path
+- [ ] `SECRET_KEY` set to a real generated value (not the source default)
+- [ ] First deploy succeeds and `/login` returns the login page
+- [ ] Log in with the seeded default admin, then change its password immediately
+- [ ] A contract created on the site is visible after refresh (confirms Postgres, not SQLite, is actually being used)
+
+## Connecting the Desktop App to a Hosted Backend
+
+By default the desktop app (`desktop.py` / the installed exe) is fully
+offline: it spawns its own local FastAPI server and talks to a local SQLite
+database, exactly as it always has. Setting `DESKTOP_BACKEND_URL` (via `.env`
+or a real environment variable) switches it to a thin-client mode instead:
+
+```
+DESKTOP_BACKEND_URL=https://your-app.onrender.com
+```
+
+With this set, `desktop.py` skips spawning a local server entirely and
+points its window directly at that URL — the desktop app and every browser
+visiting the same URL are now looking at the exact same backend and the
+exact same Postgres database, so a contract created on the website appears
+in the desktop app (and vice versa) as soon as the page is loaded or
+refreshed, with no sync step of any kind.
+
+**Document management still works in this mode**, with one internal
+difference worth knowing about: `os.startfile()` can only open a file that
+physically exists on the desktop user's own machine, but a hosted backend's
+canonical Excel/Word documents live on *its* disk, not the desktop user's.
+So when `DESKTOP_BACKEND_URL` is set, "View → Excel/Word" fetches the file
+from the backend first (the same `/contracts/{id}/view/{fmt}` route a plain
+browser tab already uses — same auth, same business logic, nothing new on
+the server side), saves a local temporary copy, and opens *that* with
+`os.startfile()`. When `DESKTOP_BACKEND_URL` is unset, the original direct
+local-disk path is used, unchanged. Either way, the file the user sees is
+the one true canonical document for that contract.
+
+Leave `DESKTOP_BACKEND_URL` unset to keep developing/using the app fully
+offline; set it only when you want a given install to act as a client of a
+shared hosted deployment.
 
 ## Future Improvements
 

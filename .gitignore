@@ -13,4 +13,7 @@ exports/*
 build/
 dist/
 Output/
+# BusinessERPSystem.spec is committed on purpose (reproducible build config);
+# only ignore other ad-hoc specs someone might generate locally.
 *.spec
+!BusinessERPSystem.spec

@@ -96,7 +96,10 @@ def _ensure_admin_exists() -> None:
 
 
 DEFAULT_ADMIN_EMAIL = "admin@hal.internal"
-DEFAULT_ADMIN_PASSWORD = "Admin@123"
+# Sourced from settings (DEFAULT_ADMIN_PASSWORD env var / .env), not a literal, so a
+# real deployment can seed its own admin password instead of this repo's documented
+# default -- see the default_admin_password field in app/config.py.
+DEFAULT_ADMIN_PASSWORD = settings.default_admin_password
 
 
 def _ensure_default_admin_user() -> None:

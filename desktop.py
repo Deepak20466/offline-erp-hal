@@ -15,16 +15,22 @@ Run this instead of ``uvicorn main:app`` for the desktop experience:
 The web routes (including the browser-tab "View" links) keep working exactly as
 before — this is a second way to run the same app, not a replacement.
 """
+import base64
+import binascii
 import logging
 import os
 import socket
+import tempfile
 import threading
 import time
+import uuid
+from pathlib import Path
 
 import uvicorn
 import webview
 
 import main as main_module
+from app.config import settings
 from app.database import SessionLocal
 from app.services import contract_service, document_service
 
@@ -82,6 +88,45 @@ class Api:
         logger.info("os.startfile succeeded for %s", file_path)
         return {"ok": True}
 
+    def save_and_open_document(self, doc_type: str, base64_data: str) -> dict:
+        """Open a document fetched by JS from a remote backend, via a local temp copy.
+
+        Only used when settings.desktop_backend_url is set (see main() below): in that
+        mode this window shows pages served by a hosted backend, so the canonical
+        file lives on that server's disk, not this machine's -- open_document() above
+        (which calls ensure_canonical_document() directly against local disk) cannot
+        resolve it. app.js instead fetches the exact same /contracts/{id}/view/{fmt}
+        route a plain browser tab already uses (unchanged, same auth/business logic),
+        and hands the bytes here purely so this trusted local process can save a temp
+        copy for os.startfile() -- no backend/database/storage code is touched.
+        """
+        logger.info("save_and_open_document called: doc_type=%r", doc_type)
+
+        if doc_type not in ("excel", "word"):
+            logger.warning("Rejected: unsupported doc_type %r", doc_type)
+            return {"ok": False, "error": "Unsupported document type"}
+
+        try:
+            raw_bytes = base64.b64decode(base64_data)
+        except (ValueError, binascii.Error) as exc:
+            logger.error("Failed to decode fetched document bytes: %s", exc)
+            return {"ok": False, "error": "Could not decode document data"}
+
+        extension = "xlsx" if doc_type == "excel" else "docx"
+        temp_dir = Path(tempfile.gettempdir()) / "hal_erp_desktop_view"
+        temp_dir.mkdir(exist_ok=True)
+        temp_path = temp_dir / f"{uuid.uuid4().hex}.{extension}"
+        temp_path.write_bytes(raw_bytes)
+
+        try:
+            os.startfile(str(temp_path))  # local temp copy of the remote backend's canonical document
+        except OSError as exc:
+            logger.error("os.startfile failed for %s: %s", temp_path, exc)
+            return {"ok": False, "error": str(exc)}
+
+        logger.info("os.startfile succeeded for %s (fetched from remote backend)", temp_path)
+        return {"ok": True}
+
 
 def _run_server() -> None:
     # Passing the app object directly (rather than the "main:app" import-string form)
@@ -92,13 +137,17 @@ def _run_server() -> None:
 
 
 def _wait_until_listening(host: str, port: int, timeout: float = 15.0) -> None:
+    # Poll interval is short (not e.g. 0.2s) purely to reduce detection lag: the
+    # window should open within milliseconds of uvicorn actually being ready, not
+    # up to an extra poll-interval's worth of time after it already is. Same
+    # overall timeout, same retry-on-OSError behavior -- only checks more often.
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
             with socket.create_connection((host, port), timeout=0.5):
                 return
         except OSError:
-            time.sleep(0.2)
+            time.sleep(0.05)
     raise RuntimeError(f"Server did not start listening on {host}:{port} within {timeout}s")
 
 
@@ -112,11 +161,37 @@ def main() -> None:
     # path at all -- it's intercepted client-side and opened via os.startfile() instead.
     webview.settings["ALLOW_DOWNLOADS"] = True
 
-    server_thread = threading.Thread(target=_run_server, daemon=True)
-    server_thread.start()
-    _wait_until_listening(HOST, PORT)
+    # pywebview's default (OPEN_EXTERNAL_LINKS_IN_BROWSER=True) hands any
+    # target="_blank" link to the OS's default external browser via
+    # webbrowser.open() instead of keeping it inside this window -- see
+    # on_new_window_request() in pywebview's edgechromium.py backend. That
+    # external browser has no session cookie for 127.0.0.1:8000 (cookies are
+    # scoped to this WebView2 instance, not shared with the system browser),
+    # so any such link hits a protected route unauthenticated and bounces to
+    # /login. The contract detail page's "Saved Documents" View link (a plain
+    # target="_blank" <a>, distinct from the JS-bridge-driven View -> Excel/
+    # Word tiles mentioned above) hit exactly this. Disabling it makes
+    # target="_blank" navigate in-place in this same authenticated window
+    # instead (pywebview's own fallback for this setting), with no effect on
+    # a plain browser tab running the same app, where this setting doesn't
+    # exist at all.
+    webview.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = False
 
-    webview.create_window("Offline ERP HAL", f"http://{HOST}:{PORT}", js_api=Api(), width=1280, height=800)
+    # settings.desktop_backend_url (DESKTOP_BACKEND_URL env var) unset -- the original,
+    # fully offline behavior: spawn our own local FastAPI/uvicorn server and point the
+    # window at it. Set it (e.g. to a Render URL) to instead point this window directly
+    # at a hosted backend sharing one Postgres database with the website -- no local
+    # server needed, since the real one is already running there.
+    if settings.desktop_backend_url:
+        window_url = settings.desktop_backend_url
+        logger.info("Using hosted backend: %s", window_url)
+    else:
+        server_thread = threading.Thread(target=_run_server, daemon=True)
+        server_thread.start()
+        _wait_until_listening(HOST, PORT)
+        window_url = f"http://{HOST}:{PORT}"
+
+    webview.create_window("Offline ERP HAL", window_url, js_api=Api(), width=1280, height=800)
     # debug=True enables right-click > Inspect in the window, so the [HAL] console
     # logs from app.js's desktop-bridge handler are visible for troubleshooting.
     webview.start(debug=True)

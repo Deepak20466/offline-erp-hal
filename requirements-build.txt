@@ -1,0 +1,7 @@
+# Build-only tooling for producing the Windows desktop exe. Not needed to run
+# the app (see requirements.txt for that) -- only to package it.
+#
+# Pinned so the exe is reproducible: a different PyInstaller version can
+# change bootloader behavior/bundled hook versions enough to alter AV
+# detection or introduce subtle runtime differences between releases.
+pyinstaller==6.21.0

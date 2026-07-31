@@ -1,8 +1,6 @@
 """Central reference to the official HAL logo asset, used across every export format."""
 from functools import lru_cache
 
-from PIL import Image as PILImage
-
 from app.config import RESOURCE_DIR
 
 LOGO_PATH = str(RESOURCE_DIR / "app" / "static" / "images" / "hal-logo.jpeg")
@@ -10,7 +8,14 @@ LOGO_PATH = str(RESOURCE_DIR / "app" / "static" / "images" / "hal-logo.jpeg")
 
 @lru_cache(maxsize=1)
 def _logo_aspect_ratio() -> float:
-    """height/width ratio of the source logo file, so exports never stretch it."""
+    """height/width ratio of the source logo file, so exports never stretch it.
+
+    Pillow is imported here (not at module level) so importing this module -- which
+    every export/PDF helper does, and which every router transitively pulls in at
+    startup -- doesn't pay Pillow's import cost unless an export actually runs.
+    """
+    from PIL import Image as PILImage
+
     with PILImage.open(LOGO_PATH) as img:
         width, height = img.size
     return height / width

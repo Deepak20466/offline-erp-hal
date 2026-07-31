@@ -52,6 +52,22 @@ class Settings(BaseSettings):
     # without a real disk behind this path, saved documents would silently vanish.
     document_storage_dir: str | None = None
 
+    # Desktop-only: which backend the desktop shell (desktop.py) points its window
+    # at. Unset (the default) preserves the original, fully offline behavior --
+    # desktop.py spawns its own local FastAPI/uvicorn server and points the window at
+    # it. Set this (e.g. to a Render URL) to instead point the desktop window at a
+    # hosted backend sharing one Postgres database with the website; see desktop.py.
+    # Irrelevant to the website itself -- main.py never reads this setting.
+    desktop_backend_url: str | None = None
+
+    # Password seeded for the default admin account (admin@hal.internal) on a
+    # brand-new deployment -- see _ensure_default_admin_user() in app/database.py.
+    # Default kept identical to the app's historical value for compatibility with
+    # existing installs/docs; override via .env or a real environment variable so a
+    # given deployment's seeded password isn't the same publicly-documented default
+    # every clone of this repo starts with.
+    default_admin_password: str = "Admin@123"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @field_validator("database_url")

@@ -1,9 +1,16 @@
 ; Inno Setup script for Business ERP System.
 ;
-; Installs the single-file exe produced by:
-;   pyinstaller --onefile --windowed --name "Business ERP System" ^
-;     --add-data "app/templates;app/templates" --add-data "app/static;app/static" ^
-;     --hidden-import passlib.handlers.bcrypt desktop.py
+; Installs the single-file exe produced by the committed PyInstaller spec
+; (reproducible build -- see BusinessERPSystem.spec for the full config):
+;
+;   pip install -r requirements-build.txt
+;   pyinstaller BusinessERPSystem.spec
+;
+; That spec is the CLI-equivalent of the original ad-hoc command
+; (--onefile --windowed --name "Business ERP System", the same --add-data/
+; --hidden-import flags), plus UPX disabled and a Windows version resource
+; (version_info.txt) -- it still produces dist\Business ERP System.exe, so
+; nothing below needed to change to stay compatible with it.
 ;
 ; Default install location is the user's own LocalAppData folder, not
 ; "C:\Program Files" — the app writes its database and permanent Excel/Word
@@ -16,7 +23,7 @@
 ; Output installer lands in Output\BusinessERPSystemSetup.exe
 
 #define MyAppName "Business ERP System"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppExeName "Business ERP System.exe"
 
 [Setup]

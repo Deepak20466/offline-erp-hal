@@ -1,11 +1,6 @@
 """Formatted tax-invoice PDF generation with the HAL logo (100px) letterhead."""
 import io
 
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import mm
-from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from starlette.responses import StreamingResponse
 
 from app.models.invoice import Invoice
@@ -15,7 +10,20 @@ LOGO_WIDTH_PX = 100
 
 
 def build_invoice_pdf(invoice: Invoice) -> bytes:
-    """Render a single invoice to PDF bytes with the company letterhead."""
+    """Render a single invoice to PDF bytes with the company letterhead.
+
+    reportlab is imported here rather than at module level: this module is
+    imported by app/routers/invoices.py at startup, and every router import
+    happens before the app can serve a single request -- deferring the import
+    to first actual PDF generation avoids paying reportlab's import cost on
+    every launch for sessions that never export an invoice PDF.
+    """
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
