@@ -8,7 +8,6 @@ from app.config import settings
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _csrf_serializer = URLSafeTimedSerializer(settings.secret_key, salt="csrf-token")
-_document_open_serializer = URLSafeTimedSerializer(settings.secret_key, salt="document-open-token")
 
 
 def hash_secret(plain: str) -> str:
@@ -58,29 +57,3 @@ def validate_csrf_token(token: str | None, max_age_seconds: int = 60 * 60 * 6) -
         return True
     except (BadSignature, SignatureExpired):
         return False
-
-
-def generate_document_open_token(contract_id: int, doc_type: str) -> str:
-    """Short-lived signed token scoped to one contract's document.
-
-    Needed only for the ms-excel:/ms-word: "Open in Desktop App" links: when a user
-    clicks one, Windows launches Excel/Word directly and that process fetches the URL
-    itself — outside the browser, so it carries none of the browser's session cookies.
-    This lets that one request past auth without exposing the document to anyone else,
-    since the token is single-purpose (only this contract_id+doc_type) and expires in
-    minutes.
-    """
-    return _document_open_serializer.dumps(f"{contract_id}:{doc_type}")
-
-
-def verify_document_open_token(
-    token: str | None, contract_id: int, doc_type: str, max_age_seconds: int = 300
-) -> bool:
-    """Validate a token previously issued by generate_document_open_token."""
-    if not token:
-        return False
-    try:
-        payload = _document_open_serializer.loads(token, max_age=max_age_seconds)
-    except (BadSignature, SignatureExpired):
-        return False
-    return payload == f"{contract_id}:{doc_type}"

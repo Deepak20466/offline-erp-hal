@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.responses import HTMLResponse
 
 from app.config import BASE_DIR
-from app.utils.security import generate_csrf_token, generate_document_open_token
+from app.utils.security import generate_csrf_token
 
 templates = Jinja2Templates(directory=str(BASE_DIR / "app" / "templates"))
 
@@ -61,4 +61,3 @@ def format_date(value, fmt: str = "%d-%b-%Y") -> str:
 templates.env.filters["inr"] = format_inr
 templates.env.filters["fdate"] = format_date
 templates.env.globals["csrf_token"] = generate_csrf_token
-templates.env.globals["document_open_token"] = generate_document_open_token

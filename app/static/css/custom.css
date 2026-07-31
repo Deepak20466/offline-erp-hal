@@ -353,115 +353,164 @@ a:hover { color: var(--hal-primary-dark); }
 }
 
 /* ==========================================================================
-   "View Document" modal (Contracts) — scoped to .doc-view-modal only, so no
-   other modal in the app (Edit Contract, Add Line Item, etc.) is affected.
+   "View Document" modal (Contracts) — scoped to .doc-view-modal / .doc-tile
+   only, so no other modal or component in the app is affected. Visual only:
+   the two primary tiles keep the .js-open-local-document hook the desktop
+   bridge JS depends on — nothing here changes behavior.
    ========================================================================== */
-.doc-view-modal .modal-content {
+.doc-view-dialog {
+  max-width: 600px;
+}
+.doc-view-modal .doc-view-content {
+  border: none;
   border-radius: 16px;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22), 0 4px 14px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 28px 64px rgba(15, 23, 42, 0.24), 0 6px 16px rgba(15, 23, 42, 0.08);
   overflow: hidden;
 }
 .doc-view-modal.fade .modal-dialog {
-  transform: scale(0.92) translateY(-16px);
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+  transform: scale(0.9) translateY(-18px);
+  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.22s ease;
 }
 .doc-view-modal.show .modal-dialog {
   transform: scale(1) translateY(0);
 }
-.doc-view-modal .modal-header {
-  padding: 1.25rem 1.5rem 1rem;
-}
-.doc-view-modal .modal-title {
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.doc-view-modal .modal-body {
-  padding: 1.5rem;
-}
 .modal-backdrop.doc-modal-backdrop {
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-  background-color: rgba(15, 23, 42, 0.55) !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  background-color: rgba(9, 14, 26, 0.6) !important;
 }
 
-.doc-open-card {
+.doc-view-modal .modal-content,
+.doc-view-modal .doc-view-title,
+.doc-view-modal .doc-tile-title {
+  font-family: var(--hal-font);
+}
+.doc-view-header {
+  padding: 1.85rem 1.85rem 1.35rem;
+  border-bottom: 1px solid var(--hal-border);
+  align-items: flex-start;
+}
+.doc-view-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  color: var(--hal-text);
+  margin: 0;
+  line-height: 1.3;
+}
+.doc-view-contract-number {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--hal-primary);
+  margin: 0.3rem 0 0;
+  letter-spacing: 0.01em;
+}
+.doc-view-modal .btn-close {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background-color: var(--hal-neutral-soft);
+  background-size: 0.85rem;
+  opacity: 1;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+.doc-view-modal .btn-close:hover {
+  background-color: var(--hal-danger-soft);
+  transform: scale(1.08);
+}
+.doc-view-modal .btn-close:focus {
+  box-shadow: 0 0 0 0.2rem var(--hal-primary-soft);
+}
+.doc-view-body {
+  padding: 1.65rem 1.85rem 1.85rem;
+}
+
+.doc-tile {
   display: flex;
   align-items: center;
-  gap: 0.875rem;
-  padding: 0.9rem 1.1rem;
-  border: 1px solid var(--hal-border);
-  border-radius: var(--hal-radius-sm);
+  gap: 1.1rem;
+  padding: 1.35rem 1.5rem;
+  border: 1.5px solid var(--hal-border);
+  border-radius: 14px;
   background-color: var(--hal-surface);
   color: var(--hal-text);
   text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
 }
-.doc-open-card + .doc-open-card {
-  margin-top: 0.6rem;
+.doc-tile + .doc-tile {
+  margin-top: 0.9rem;
 }
-.doc-open-card:hover,
-.doc-open-card:focus-visible {
-  transform: translateY(-2px);
-  box-shadow: var(--hal-shadow);
-  border-color: var(--hal-primary-light);
-  background-color: var(--hal-primary-soft);
+.doc-tile:hover,
+.doc-tile:focus-visible {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
   color: var(--hal-text);
   text-decoration: none;
 }
-.doc-open-card .doc-open-icon {
-  font-size: 1.4rem;
-  width: 2.5rem;
-  height: 2.5rem;
+.doc-tile-excel:hover { border-color: #217346; background-color: #f2faf5; }
+.doc-tile-word:hover { border-color: #2b579a; background-color: #f2f6fd; }
+[data-bs-theme="dark"] .doc-tile-excel:hover { background-color: rgba(33, 115, 70, 0.12); }
+[data-bs-theme="dark"] .doc-tile-word:hover { background-color: rgba(43, 87, 154, 0.14); }
+
+.doc-tile-icon {
+  font-size: 2.1rem;
+  width: 3.5rem;
+  height: 3.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--hal-radius-sm);
+  border-radius: 12px;
   flex-shrink: 0;
+  transition: transform 0.18s ease;
 }
-.doc-open-card.doc-open-excel .doc-open-icon { background-color: #e6f4ea; color: #217346; }
-.doc-open-card.doc-open-word .doc-open-icon { background-color: #e8eefc; color: #2b579a; }
-[data-bs-theme="dark"] .doc-open-card.doc-open-excel .doc-open-icon { background-color: rgba(33, 115, 70, 0.2); color: #4caf7d; }
-[data-bs-theme="dark"] .doc-open-card.doc-open-word .doc-open-icon { background-color: rgba(43, 87, 154, 0.24); color: #7ea3e0; }
-.doc-open-card .doc-open-body {
+.doc-tile:hover .doc-tile-icon {
+  transform: scale(1.06);
+}
+.doc-tile-excel .doc-tile-icon { background-color: #e6f4ea; color: #217346; }
+.doc-tile-word .doc-tile-icon { background-color: #e8eefc; color: #2b579a; }
+[data-bs-theme="dark"] .doc-tile-excel .doc-tile-icon { background-color: rgba(33, 115, 70, 0.2); color: #4caf7d; }
+[data-bs-theme="dark"] .doc-tile-word .doc-tile-icon { background-color: rgba(43, 87, 154, 0.24); color: #7ea3e0; }
+
+.doc-tile-text {
   flex: 1 1 auto;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
-.doc-open-card .doc-open-label {
-  font-weight: 600;
-  font-size: 0.95rem;
+.doc-tile-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--hal-text);
 }
-.doc-open-card .doc-open-sub {
-  font-size: 0.78rem;
-  color: var(--hal-text-muted);
-}
-.doc-open-card .doc-open-chevron {
+.doc-tile-chevron {
+  font-size: 1.15rem;
   color: var(--hal-text-subtle);
-  transition: transform 0.15s ease, color 0.15s ease;
+  transition: transform 0.18s ease, color 0.18s ease;
   flex-shrink: 0;
 }
-.doc-open-card:hover .doc-open-chevron {
-  transform: translateX(3px);
+.doc-tile:hover .doc-tile-chevron {
+  transform: translateX(5px);
   color: var(--hal-primary);
 }
-.doc-open-card.doc-open-secondary {
-  padding: 0.6rem 0.9rem;
-  background-color: var(--hal-neutral-soft);
-}
-.doc-open-card.doc-open-secondary .doc-open-icon {
-  font-size: 1.05rem;
-  width: 2rem;
-  height: 2rem;
-}
-.doc-open-card.doc-open-secondary .doc-open-label {
-  font-size: 0.85rem;
-}
+
 @media (max-width: 575.98px) {
-  .doc-view-modal .modal-dialog {
+  .doc-view-dialog {
     margin: 0.75rem;
   }
-  .doc-open-card {
-    padding: 0.75rem 0.9rem;
+  .doc-view-header {
+    padding: 1.25rem 1.25rem 1rem;
+  }
+  .doc-view-body {
+    padding: 1.25rem;
+  }
+  .doc-tile {
+    padding: 0.9rem 1rem;
+  }
+  .doc-tile-icon {
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 1.5rem;
   }
 }
 

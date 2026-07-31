@@ -260,54 +260,31 @@
 <!-- View Document Modals -->
 {% for contract in page_result.items %}
 <div class="modal fade doc-view-modal" id="documentsModal{{ contract.id }}" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-folder2-open me-2 text-primary"></i>View Document — {{ contract.contract_number }}</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+  <div class="modal-dialog doc-view-dialog modal-dialog-centered">
+    <div class="modal-content doc-view-content">
+      <div class="modal-header doc-view-header">
+        <div>
+          <h5 class="modal-title doc-view-title">View Document</h5>
+          <p class="doc-view-contract-number">{{ contract.contract_number }}</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body">
-        <p class="text-muted small mb-3">
-          Opens this contract's Excel/Word document. Each contract has exactly one of each —
-          created the first time it's opened, then never regenerated or overwritten again.
-        </p>
-        <a href="/contracts/{{ contract.id }}/view/excel" target="_blank" rel="noopener" class="doc-open-card doc-open-excel js-open-local-document" data-contract-id="{{ contract.id }}" data-doc-type="excel">
-          <span class="doc-open-icon"><i class="bi bi-filetype-xlsx"></i></span>
-          <span class="doc-open-body">
-            <span class="doc-open-label d-block">Open Excel</span>
-            <span class="doc-open-sub d-block">View the saved spreadsheet</span>
+      <div class="modal-body doc-view-body">
+        <a href="/contracts/{{ contract.id }}/view/excel" rel="noopener" class="doc-tile doc-tile-excel js-open-local-document" data-contract-id="{{ contract.id }}" data-doc-type="excel">
+          <span class="doc-tile-icon"><i class="bi bi-filetype-xlsx"></i></span>
+          <span class="doc-tile-text">
+            <span class="doc-tile-title">Microsoft Excel</span>
           </span>
-          <i class="bi bi-chevron-right doc-open-chevron"></i>
+          <i class="bi bi-download doc-tile-chevron"></i>
         </a>
-        <a href="/contracts/{{ contract.id }}/view/word" target="_blank" rel="noopener" class="doc-open-card doc-open-word js-open-local-document" data-contract-id="{{ contract.id }}" data-doc-type="word">
-          <span class="doc-open-icon"><i class="bi bi-filetype-docx"></i></span>
-          <span class="doc-open-body">
-            <span class="doc-open-label d-block">Open MS Word</span>
-            <span class="doc-open-sub d-block">View the saved document</span>
+
+        <a href="/contracts/{{ contract.id }}/view/word" rel="noopener" class="doc-tile doc-tile-word js-open-local-document" data-contract-id="{{ contract.id }}" data-doc-type="word">
+          <span class="doc-tile-icon"><i class="bi bi-filetype-docx"></i></span>
+          <span class="doc-tile-text">
+            <span class="doc-tile-title">Microsoft Word</span>
           </span>
-          <i class="bi bi-chevron-right doc-open-chevron"></i>
+          <i class="bi bi-download doc-tile-chevron"></i>
         </a>
-        {% if request.url.scheme == 'https' %}
-        <p class="text-muted small mb-2 mt-4">Launch directly in the desktop app (Windows + Microsoft Office required):</p>
-        <a href="ms-excel:ofe|u|{{ request.url_for('open_contract_document', contract_id=contract.id, fmt='excel') }}?token={{ document_open_token(contract.id, 'excel') }}" class="doc-open-card doc-open-excel doc-open-secondary">
-          <span class="doc-open-icon"><i class="bi bi-box-arrow-up-right"></i></span>
-          <span class="doc-open-body">
-            <span class="doc-open-label d-block">Open in Excel (Desktop App)</span>
-          </span>
-          <i class="bi bi-chevron-right doc-open-chevron"></i>
-        </a>
-        <a href="ms-word:ofe|u|{{ request.url_for('open_contract_document', contract_id=contract.id, fmt='word') }}?token={{ document_open_token(contract.id, 'word') }}" class="doc-open-card doc-open-word doc-open-secondary">
-          <span class="doc-open-icon"><i class="bi bi-box-arrow-up-right"></i></span>
-          <span class="doc-open-body">
-            <span class="doc-open-label d-block">Open in Word (Desktop App)</span>
-          </span>
-          <i class="bi bi-chevron-right doc-open-chevron"></i>
-        </a>
-        {% else %}
-        <p class="text-muted small mb-0 mt-4">
-          <i class="bi bi-info-circle me-1"></i>Launching directly in the Excel/Word desktop app requires this site to be served over HTTPS (it's currently plain HTTP).
-        </p>
-        {% endif %}
       </div>
     </div>
   </div>
