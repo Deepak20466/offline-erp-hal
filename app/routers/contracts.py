@@ -8,12 +8,13 @@ from starlette.responses import FileResponse, RedirectResponse, StreamingRespons
 
 from app.config import settings
 from app.database import get_db
-from app.dependencies import check_csrf, require_login
+from app.dependencies import check_csrf, get_current_user, require_login
 from app.models.user import User
 from app.schemas.contract import ContractCreate, ContractUpdate
 from app.services import client_service, contract_service, custom_field_service, document_service, line_item_service
 from app.templating import render
 from app.utils.exporters import build_excel_bytes, build_word_bytes, export_csv, export_excel, export_pdf, export_word
+from app.utils.security import verify_document_open_token
 
 DOCUMENT_MEDIA_TYPES = {
     "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -43,7 +44,6 @@ def list_contracts(
     values_by_contract = custom_field_service.get_values_for_records(
         db, "contracts", [c.id for c in result.items]
     )
-    documents_by_contract = document_service.latest_documents_map(db, [c.id for c in result.items])
     return render(
         request,
         "contracts/list.html",
@@ -57,7 +57,6 @@ def list_contracts(
             "clients": clients,
             "custom_fields": custom_fields,
             "values_by_contract": values_by_contract,
-            "documents_by_contract": documents_by_contract,
         },
         user=user,
         active_nav="contracts",
@@ -147,6 +146,50 @@ def export_contract_document(
         io.BytesIO(content),
         media_type=DOCUMENT_MEDIA_TYPES[fmt],
         headers={"Content-Disposition": f'attachment; filename="{document.original_filename}"'},
+    )
+
+
+@router.get("/{contract_id}/view/{fmt}")
+def open_contract_document(
+    contract_id: int,
+    fmt: str,
+    token: str | None = None,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user),
+):
+    """Open this contract's single permanent Excel/Word document ("Open Excel" / "Open MS Word").
+
+    Completely separate from Export above: there is exactly one Excel file and one Word
+    file per contract, created the first time it's opened and never touched again after
+    that — not regenerated, not overwritten, regardless of later contract edits or how
+    many times this is opened again. Edits made inside the file (in Excel/Word itself)
+    stay in the file only; this route never reads its content back into the database.
+    Served inline (not as an attachment) so the browser doesn't force a Save-As dialog.
+
+    Auth accepts either the normal session cookie, or a short-lived signed ``token``
+    (see ``generate_document_open_token``) — needed for the ms-excel:/ms-word: "Open in
+    Desktop App" links, since Office's own fetch of this URL happens outside the
+    browser and carries no session cookie.
+    """
+    if fmt not in DOCUMENT_MEDIA_TYPES:
+        return RedirectResponse(f"/contracts/{contract_id}?error=Unsupported+document+format", status_code=303)
+
+    if user is None and not verify_document_open_token(token, contract_id, fmt):
+        return RedirectResponse("/login", status_code=303)
+
+    contract = contract_service.get_active_contract(db, contract_id)
+    if contract is None:
+        return RedirectResponse("/contracts?error=Contract+not+found", status_code=303)
+
+    file_path = document_service.ensure_canonical_document(db, contract, fmt)
+
+    label = "Excel" if fmt == "excel" else "MS_Word"
+    extension = document_service.EXTENSION_BY_TYPE[fmt]
+    return FileResponse(
+        file_path,
+        media_type=DOCUMENT_MEDIA_TYPES[fmt],
+        filename=f"{contract.contract_number}_{label}.{extension}",
+        content_disposition_type="inline",
     )
 
 

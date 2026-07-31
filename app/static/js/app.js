@@ -235,6 +235,58 @@
     });
   }
 
+  function initDesktopDocumentOpen() {
+    // Only intercepts clicks when running inside the pywebview desktop shell
+    // (window.pywebview is injected by pywebview itself, never present in a
+    // plain browser tab). In a browser tab, these links fall through to their
+    // normal href and behave exactly as before — this is additive, not a
+    // replacement of the browser-facing "View" route.
+    document.addEventListener("click", function (e) {
+      var link = e.target.closest(".js-open-local-document");
+      if (!link) return;
+
+      var bridgeReady = window.pywebview && window.pywebview.api && typeof window.pywebview.api.open_document === "function";
+      if (!bridgeReady) {
+        console.log("[HAL] Desktop bridge not available (window.pywebview.api.open_document missing) — using browser link instead.");
+        return; // not running inside the desktop shell; let the normal href navigate
+      }
+
+      e.preventDefault();
+      var contractId = parseInt(link.dataset.contractId, 10);
+      var docType = link.dataset.docType;
+      console.log("[HAL] Calling desktop bridge open_document(" + contractId + ", " + docType + ")");
+      window.pywebview.api.open_document(contractId, docType).then(function (result) {
+        console.log("[HAL] open_document resolved:", result);
+        if (!result || !result.ok) {
+          showToast("Could not open document: " + ((result && result.error) || "unknown error"), "error");
+        }
+      }).catch(function (err) {
+        // Without this .catch, any unexpected Python-side exception rejects this
+        // promise silently — nothing shows on screen even though the bridge call
+        // genuinely failed. This is what makes failures visible going forward.
+        console.error("[HAL] open_document bridge call threw:", err);
+        showToast("Could not open document: " + (err && err.message ? err.message : "bridge error — see console"), "error");
+      });
+    });
+  }
+
+  function initDocViewModalBackdrop() {
+    // Purely cosmetic: tags the Bootstrap-generated backdrop so CSS can blur/darken
+    // it only behind the "View Document" modal, without touching Bootstrap's shared
+    // backdrop element (which every other modal in the app also uses) and without
+    // going anywhere near document-opening/click behavior.
+    document.querySelectorAll(".doc-view-modal").forEach(function (modalEl) {
+      modalEl.addEventListener("shown.bs.modal", function () {
+        var backdrop = document.querySelector(".modal-backdrop:last-of-type");
+        if (backdrop) backdrop.classList.add("doc-modal-backdrop");
+      });
+      modalEl.addEventListener("hidden.bs.modal", function () {
+        var backdrop = document.querySelector(".modal-backdrop.doc-modal-backdrop");
+        if (backdrop) backdrop.classList.remove("doc-modal-backdrop");
+      });
+    });
+  }
+
   function initDynamicFieldTypeToggle() {
     document.querySelectorAll(".field-type-select").forEach(function (typeSelect) {
       var wrap = typeSelect.closest("form").querySelector(".dropdown-options-wrap");
@@ -259,6 +311,8 @@
     initBulkSelect();
     initButtonRipple();
     initPageLoader();
+    initDesktopDocumentOpen();
+    initDocViewModalBackdrop();
   });
 
   window.HAL = { showToast: showToast };

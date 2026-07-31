@@ -353,6 +353,119 @@ a:hover { color: var(--hal-primary-dark); }
 }
 
 /* ==========================================================================
+   "View Document" modal (Contracts) — scoped to .doc-view-modal only, so no
+   other modal in the app (Edit Contract, Add Line Item, etc.) is affected.
+   ========================================================================== */
+.doc-view-modal .modal-content {
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22), 0 4px 14px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+.doc-view-modal.fade .modal-dialog {
+  transform: scale(0.92) translateY(-16px);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+}
+.doc-view-modal.show .modal-dialog {
+  transform: scale(1) translateY(0);
+}
+.doc-view-modal .modal-header {
+  padding: 1.25rem 1.5rem 1rem;
+}
+.doc-view-modal .modal-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.doc-view-modal .modal-body {
+  padding: 1.5rem;
+}
+.modal-backdrop.doc-modal-backdrop {
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  background-color: rgba(15, 23, 42, 0.55) !important;
+}
+
+.doc-open-card {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--hal-border);
+  border-radius: var(--hal-radius-sm);
+  background-color: var(--hal-surface);
+  color: var(--hal-text);
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.doc-open-card + .doc-open-card {
+  margin-top: 0.6rem;
+}
+.doc-open-card:hover,
+.doc-open-card:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: var(--hal-shadow);
+  border-color: var(--hal-primary-light);
+  background-color: var(--hal-primary-soft);
+  color: var(--hal-text);
+  text-decoration: none;
+}
+.doc-open-card .doc-open-icon {
+  font-size: 1.4rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--hal-radius-sm);
+  flex-shrink: 0;
+}
+.doc-open-card.doc-open-excel .doc-open-icon { background-color: #e6f4ea; color: #217346; }
+.doc-open-card.doc-open-word .doc-open-icon { background-color: #e8eefc; color: #2b579a; }
+[data-bs-theme="dark"] .doc-open-card.doc-open-excel .doc-open-icon { background-color: rgba(33, 115, 70, 0.2); color: #4caf7d; }
+[data-bs-theme="dark"] .doc-open-card.doc-open-word .doc-open-icon { background-color: rgba(43, 87, 154, 0.24); color: #7ea3e0; }
+.doc-open-card .doc-open-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.doc-open-card .doc-open-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.doc-open-card .doc-open-sub {
+  font-size: 0.78rem;
+  color: var(--hal-text-muted);
+}
+.doc-open-card .doc-open-chevron {
+  color: var(--hal-text-subtle);
+  transition: transform 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+.doc-open-card:hover .doc-open-chevron {
+  transform: translateX(3px);
+  color: var(--hal-primary);
+}
+.doc-open-card.doc-open-secondary {
+  padding: 0.6rem 0.9rem;
+  background-color: var(--hal-neutral-soft);
+}
+.doc-open-card.doc-open-secondary .doc-open-icon {
+  font-size: 1.05rem;
+  width: 2rem;
+  height: 2rem;
+}
+.doc-open-card.doc-open-secondary .doc-open-label {
+  font-size: 0.85rem;
+}
+@media (max-width: 575.98px) {
+  .doc-view-modal .modal-dialog {
+    margin: 0.75rem;
+  }
+  .doc-open-card {
+    padding: 0.75rem 0.9rem;
+  }
+}
+
+/* ==========================================================================
    Tables — one look for every register/list in the app
    ========================================================================== */
 .table-hal {

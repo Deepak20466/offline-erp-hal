@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session
 from app.config import CONTRACT_FILES_DIR
 from app.models.contract import Contract
 from app.models.contract_document import ContractDocument
+from app.services import line_item_service
+from app.utils.exporters import build_excel_bytes, build_word_bytes
 
 EXTENSION_BY_TYPE = {"excel": "xlsx", "word": "docx"}
 LABEL_BY_TYPE = {"excel": "Excel", "word": "Word"}
@@ -92,6 +94,43 @@ def save_document_version(
     db.add(document)
     db.flush()
     return document
+
+
+def canonical_document_path(contract_id: int, doc_type: str) -> Path:
+    """Path to this contract's single permanent Excel/Word document (the "View" feature).
+
+    Deliberately separate from the versioned Export system above: fixed filename (not
+    UUID-based, not tracked in the ``contract_documents`` table), so there is exactly
+    one Excel file and one Word file per contract, ever. The caller is responsible for
+    only writing to this path once, the first time it doesn't exist — this function
+    just resolves where that file lives.
+    """
+    extension = EXTENSION_BY_TYPE[doc_type]
+    return _contract_dir(contract_id) / f"view.{extension}"
+
+
+def ensure_canonical_document(db: Session, contract: Contract, doc_type: str) -> Path:
+    """Return this contract's permanent View document, creating it once if it doesn't exist yet.
+
+    Shared by both the HTTP "View" route and the desktop launcher's open-in-app bridge,
+    so a browser tab and the native window resolve/create the exact same file — never
+    two separate copies. Only ever writes on the very first call for a given
+    contract+type; every call after that just returns the existing path untouched.
+    """
+    file_path = canonical_document_path(contract.id, doc_type)
+    if not file_path.exists():
+        items = line_item_service.list_line_items(db, contract.id)
+        headers = ["Description", "Quantity", "Unit Rate", "Amount", "Status"]
+        rows = [
+            [item.description, float(item.quantity), float(item.unit_rate), float(item.amount), item.status]
+            for item in items
+        ]
+        if doc_type == "excel":
+            content = build_excel_bytes(headers, rows, sheet_name="Line Items")
+        else:
+            content = build_word_bytes(f"Contract {contract.contract_number}", headers, rows)
+        file_path.write_bytes(content)
+    return file_path
 
 
 def list_documents(db: Session, contract_id: int) -> list[ContractDocument]:
