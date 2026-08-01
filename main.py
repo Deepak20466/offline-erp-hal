@@ -32,7 +32,26 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title=settings.app_name)
 
-app.mount("/static", StaticFiles(directory=str(RESOURCE_DIR / "app" / "static")), name="static")
+
+class CachedStaticFiles(StaticFiles):
+    """StaticFiles that also tells the browser it can reuse a file for an hour.
+
+    Without this, every CSS/JS/font/image gets re-requested (or at best
+    re-validated) on every single page navigation, since the default StaticFiles
+    response has no Cache-Control header at all. The existing ETag/Last-Modified
+    headers already support conditional GETs, so a request past the hour mark
+    still resolves correctly (a cheap 304) rather than ever serving stale content
+    silently -- this only skips the round-trip entirely within that hour.
+    """
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=3600"
+        return response
+
+
+app.mount("/static", CachedStaticFiles(directory=str(RESOURCE_DIR / "app" / "static")), name="static")
 
 app.include_router(auth.router)
 app.include_router(dashboard.router)
