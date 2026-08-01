@@ -235,6 +235,39 @@
     });
   }
 
+  // Remote mode only: desktop.py calls this (via webview's evaluate_js) after it
+  // notices the local temp copy it opened via os.startfile() was edited and saved,
+  // so those edits reach the same permanent-document-upload route a browser tab's
+  // "Upload Updated Excel/Word" button already posts to -- otherwise an edit to the
+  // disposable temp copy has nowhere to go, and the next "View" just re-downloads
+  // the original, unedited file again.
+  window.__halUploadUpdatedDocument = function (contractId, docType, csrfToken, base64Data) {
+    var byteChars = atob(base64Data);
+    var byteNumbers = new Array(byteChars.length);
+    for (var i = 0; i < byteChars.length; i++) {
+      byteNumbers[i] = byteChars.charCodeAt(i);
+    }
+    var mimeType = docType === "excel"
+      ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    var extension = docType === "excel" ? "xlsx" : "docx";
+    var blob = new Blob([new Uint8Array(byteNumbers)], { type: mimeType });
+    var formData = new FormData();
+    formData.append("csrf_token", csrfToken);
+    formData.append("file", blob, "document." + extension);
+
+    return fetch("/contracts/" + contractId + "/view/" + docType + "/upload", {
+      method: "POST",
+      credentials: "same-origin",
+      body: formData,
+    }).then(function (response) {
+      console.log("[HAL] Auto-upload of edited " + docType + " document -> HTTP " + response.status);
+      return response.status;
+    }).catch(function (err) {
+      console.error("[HAL] Auto-upload of edited document failed:", err);
+    });
+  };
+
   function initDesktopDocumentOpen() {
     // Only intercepts clicks when running inside the pywebview desktop shell
     // (window.pywebview is injected by pywebview itself, never present in a
@@ -305,7 +338,14 @@
           });
         })
         .then(function (base64Data) {
-          return window.pywebview.api.save_and_open_document(docType, base64Data);
+          // Grabs whatever CSRF token happens to be rendered on the current page (any
+          // form's hidden field works -- tokens aren't tied to a specific form) so the
+          // bridge can hand it back later for an auto-upload if the user edits and
+          // saves the opened file. Tokens are valid for hours, so this stays usable
+          // well past a typical edit session.
+          var csrfInput = document.querySelector('input[name="csrf_token"]');
+          var csrfToken = csrfInput ? csrfInput.value : "";
+          return window.pywebview.api.save_and_open_document(docType, base64Data, contractId, csrfToken);
         })
         .then(function (result) {
           console.log("[HAL] save_and_open_document resolved:", result);

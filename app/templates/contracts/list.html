@@ -292,6 +292,13 @@
           </span>
           <i class="bi bi-download doc-tile-chevron"></i>
         </a>
+        <form method="post" action="/contracts/{{ contract.id }}/view/word/upload" enctype="multipart/form-data" class="doc-upload">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="doc-upload-btn">
+            <i class="bi bi-upload"></i>Upload Updated Word
+            <input type="file" name="file" accept=".docx" class="doc-upload-input" onchange="this.form.requestSubmit()">
+          </label>
+        </form>
       </div>
     </div>
   </div>

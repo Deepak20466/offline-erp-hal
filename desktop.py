@@ -17,6 +17,7 @@ before — this is a second way to run the same app, not a replacement.
 """
 import base64
 import binascii
+import json
 import logging
 import os
 import socket
@@ -46,6 +47,12 @@ logger = logging.getLogger("desktop")
 
 class Api:
     """Bridge exposed to page JavaScript as ``window.pywebview.api``."""
+
+    def __init__(self) -> None:
+        # Set by main() right after webview.create_window() returns the window
+        # object -- save_and_open_document()'s re-upload watcher needs it to call
+        # back into page JS (evaluate_js) once an edited temp copy is detected.
+        self.window = None
 
     def open_document(self, contract_id: int, doc_type: str) -> dict:
         """Open a contract's permanent Excel/Word document with the OS default app.
@@ -88,7 +95,9 @@ class Api:
         logger.info("os.startfile succeeded for %s", file_path)
         return {"ok": True}
 
-    def save_and_open_document(self, doc_type: str, base64_data: str) -> dict:
+    def save_and_open_document(
+        self, doc_type: str, base64_data: str, contract_id: int, csrf_token: str
+    ) -> dict:
         """Open a document fetched by JS from a remote backend, via a local temp copy.
 
         Only used when settings.desktop_backend_url is set (see main() below): in that
@@ -99,8 +108,14 @@ class Api:
         route a plain browser tab already uses (unchanged, same auth/business logic),
         and hands the bytes here purely so this trusted local process can save a temp
         copy for os.startfile() -- no backend/database/storage code is touched.
+
+        The temp copy is disposable by nature (os.startfile() has no way to open the
+        real file, which lives on the backend's own disk) -- so a background watcher
+        is started to push any edits the user saves back to the backend via the same
+        upload route a browser tab's "Upload Updated Excel/Word" button already posts
+        to, otherwise those edits would only ever exist in a throwaway temp file.
         """
-        logger.info("save_and_open_document called: doc_type=%r", doc_type)
+        logger.info("save_and_open_document called: doc_type=%r contract_id=%r", doc_type, contract_id)
 
         if doc_type not in ("excel", "word"):
             logger.warning("Rejected: unsupported doc_type %r", doc_type)
@@ -125,7 +140,69 @@ class Api:
             return {"ok": False, "error": str(exc)}
 
         logger.info("os.startfile succeeded for %s (fetched from remote backend)", temp_path)
+
+        threading.Thread(
+            target=self._watch_and_reupload,
+            args=(temp_path, contract_id, doc_type, csrf_token),
+            daemon=True,
+        ).start()
+
         return {"ok": True}
+
+    def _watch_and_reupload(self, temp_path: Path, contract_id: int, doc_type: str, csrf_token: str) -> None:
+        """Poll a remote-mode temp document copy; push edits back to the backend.
+
+        Runs for up to an hour (ample for one edit-and-save session) polling the temp
+        file's mtime every few seconds. Each time it changes -- i.e. the user saved in
+        Excel/Word -- the new bytes are handed to app.js's __halUploadUpdatedDocument
+        (via evaluate_js) to POST to the existing /contracts/{id}/view/{fmt}/upload
+        route, the same one a browser tab's "Upload Updated Excel/Word" button uses.
+        JS does the actual POST (not this thread) because it runs in the page's own
+        origin, so the session cookie is attached automatically -- this thread has no
+        session of its own and isn't meant to acquire one.
+        """
+        try:
+            last_mtime = temp_path.stat().st_mtime
+        except OSError:
+            return
+
+        deadline = time.monotonic() + 3600
+        while time.monotonic() < deadline:
+            time.sleep(3)
+            if not temp_path.exists():
+                return
+            try:
+                mtime = temp_path.stat().st_mtime
+            except OSError:
+                continue
+            if mtime == last_mtime:
+                continue
+            last_mtime = mtime
+            time.sleep(0.5)  # let Excel/Word finish flushing the save before reading
+
+            try:
+                raw_bytes = temp_path.read_bytes()
+            except OSError as exc:
+                logger.error("Failed to read updated temp document %s: %s", temp_path, exc)
+                continue
+
+            if self.window is None:
+                logger.warning("No window reference available; cannot push updated document back")
+                continue
+
+            b64 = base64.b64encode(raw_bytes).decode("ascii")
+            js_call = (
+                "window.__halUploadUpdatedDocument("
+                f"{json.dumps(contract_id)}, {json.dumps(doc_type)}, "
+                f"{json.dumps(csrf_token)}, {json.dumps(b64)})"
+            )
+            try:
+                self.window.evaluate_js(js_call)
+                logger.info(
+                    "Pushed edited %s document (contract %s) back to the backend", doc_type, contract_id
+                )
+            except Exception as exc:  # noqa: BLE001 - evaluate_js can raise various pywebview/JS errors
+                logger.error("Failed to push updated document back to backend: %s", exc)
 
 
 def _run_server() -> None:
@@ -191,7 +268,9 @@ def main() -> None:
         _wait_until_listening(HOST, PORT)
         window_url = f"http://{HOST}:{PORT}"
 
-    webview.create_window("Offline ERP HAL", window_url, js_api=Api(), width=1280, height=800)
+    api = Api()
+    window = webview.create_window("Offline ERP HAL", window_url, js_api=api, width=1280, height=800)
+    api.window = window  # lets save_and_open_document's re-upload watcher call back into page JS
     # debug=True enables right-click > Inspect in the window, so the [HAL] console
     # logs from app.js's desktop-bridge handler are visible for troubleshooting.
     webview.start(debug=True)
